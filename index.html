@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="ko" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SAYO (사요) — 그래서 지금 사요?</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif; background-color: #0b0f19; color: #f1f5f9; }
+    .card-hover { transition: all 0.2s ease; }
+    .card-hover:hover { transform: translateY(-2px); border-color: #38bdf8; }
+  </style>
+</head>
+<body class="min-h-screen pb-16">
+
+  <!-- 상단 헤더 -->
+  <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-30">
+    <div class="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="text-xl">🚦</span>
+          <h1 class="text-xl font-extrabold tracking-tight text-white">SAYO <span class="text-xs font-semibold text-slate-400">사요</span></h1>
+        </div>
+        <p class="text-sm font-bold text-sky-400 mt-0.5">"그래서 지금 사요?" <span class="text-xs font-normal text-slate-400">— 6대 자산 바겐세일 신호등</span></p>
+      </div>
+      <div class="text-right">
+        <span id="update-time" class="text-xs text-slate-400 bg-slate-800 px-2.5 py-1 rounded-full">자동 업데이트 연동됨</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-4xl mx-auto px-4 mt-5 space-y-6">
+
+    <!-- 최상단: 오늘 가장 싼 자산 한 줄 요약 -->
+    <div class="bg-gradient-to-r from-emerald-950/60 to-slate-900 border border-emerald-500/30 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+      <div class="flex items-center gap-2.5">
+        <span class="text-lg">💡</span>
+        <p id="top-summary" class="text-sm sm:text-base font-semibold text-slate-100">
+          오늘 가장 싼 자산: <span class="text-emerald-400 font-extrabold">미국 장기채(TLT)</span> · <span class="text-emerald-400 font-extrabold">은(SLV)</span>
+        </p>
+      </div>
+      <button onclick="filterGreenOnly()" id="filter-btn" class="text-xs font-bold bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 px-3 py-1.5 rounded-lg transition self-start sm:self-auto">
+        🟢 '지금 사요!'만 모아보기
+      </button>
+    </div>
+
+    <!-- 1단: 일간/주간 급락·급등 알약 티커 -->
+    <section class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4">
+      <div class="flex items-center justify-between mb-3">
+        <span class="text-xs font-bold text-slate-400">⚡ 이상 징후 레이더 (클릭 시 상세)</span>
+        <div class="inline-flex bg-slate-800 rounded-lg p-0.5 text-xs">
+          <button id="btn-1d" onclick="setPeriod('1D')" class="px-2.5 py-1 rounded-md font-bold bg-sky-500 text-slate-950">오늘(1D)</button>
+          <button id="btn-1w" onclick="setPeriod('1W')" class="px-2.5 py-1 rounded-md font-semibold text-slate-400">이번 주(1W)</button>
+        </div>
+      </div>
+      <div class="flex flex-wrap items-center gap-2 text-xs" id="mover-pills"></div>
+    </section>
+
+    <!-- 2단: 6대 자산 미니멀 신호등 카드 (2x3 그리드) -->
+    <section>
+      <div class="flex items-center justify-between mb-2.5">
+        <h2 class="text-sm font-bold text-slate-300">🚦 6대 자산 대표 신호등 <span class="text-xs font-normal text-slate-500">(카드를 누르면 세부 종목이 열립니다)</span></h2>
+      </div>
+      <div id="category-grid" class="grid grid-cols-2 sm:grid-cols-3 gap-3"></div>
+    </section>
+
+    <!-- 3단: 클릭 시 열리는 세부 종목 서랍 -->
+    <section id="drawer-section" class="hidden bg-slate-900 border border-sky-500/40 rounded-2xl p-4 shadow-xl">
+      <div class="flex items-center justify-between pb-3 mb-3 border-b border-slate-800">
+        <h3 id="drawer-title" class="text-base font-extrabold text-white">세부 종목</h3>
+        <button onclick="closeDrawer()" class="text-xs text-slate-400 hover:text-white px-2 py-1 rounded bg-slate-800">접기 ▲</button>
+      </div>
+      <p class="text-xs text-slate-400 mb-3">👇 종목을 한 번 더 누르면 100점 만점 채점 근거가 뜹니다.</p>
+      <div id="drawer-list" class="space-y-2"></div>
+    </section>
+
+    <!-- 4단: 상대 가성비 판독기 -->
+    <section class="bg-slate-900/70 border border-slate-800 rounded-2xl p-4">
+      <h2 class="text-sm font-bold text-slate-300 mb-3">⚖️ 둘 중 뭐가 더 쌀까? (상대 가성비)</h2>
+      <div id="ratios-list" class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs"></div>
+    </section>
+
+  </main>
+
+  <!-- 상세 100점 채점표 모달 팝업 -->
+  <div id="score-modal" onclick="if(event.target===this)closeModal()" class="hidden fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-md w-full p-5 shadow-2xl space-y-4">
+      <div class="flex items-start justify-between">
+        <div>
+          <span id="modal-cat" class="text-xs font-semibold text-sky-400"></span>
+          <h3 id="modal-name" class="text-lg font-extrabold text-white mt-0.5"></h3>
+          <p id="modal-price" class="text-xs text-slate-400 mt-0.5"></p>
+        </div>
+        <button onclick="closeModal()" class="text-slate-400 hover:text-white text-sm bg-slate-800 px-2.5 py-1 rounded-lg">✕</button>
+      </div>
+
+      <div id="modal-badge-box" class="p-3 rounded-xl border flex items-center justify-between">
+        <span id="modal-score" class="text-2xl font-extrabold"></span>
+        <span id="modal-signal" class="text-xs font-extrabold px-3 py-1 rounded-full"></span>
+      </div>
+
+      <p id="modal-comment" class="text-xs text-slate-300 bg-slate-800/70 p-3 rounded-xl leading-relaxed"></p>
+
+      <div class="space-y-2.5 text-xs">
+        <div class="font-bold text-slate-300">📊 100점 만점 팩트 채점표</div>
+        <div>
+          <div class="flex justify-between mb-1"><span>1. 200일 장기 평균선 위치</span><span id="m-s1" class="font-bold"></span></div>
+          <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden"><div id="m-b1" class="bg-sky-400 h-full"></div></div>
+        </div>
+        <div>
+          <div class="flex justify-between mb-1"><span>2. 고점 대비 할인율 & RSI</span><span id="m-s2" class="font-bold"></span></div>
+          <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden"><div id="m-b2" class="bg-emerald-400 h-full"></div></div>
+        </div>
+        <div>
+          <div class="flex justify-between mb-1"><span>3. 금리·배당·박스권 매력도</span><span id="m-s3" class="font-bold"></span></div>
+          <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden"><div id="m-b3" class="bg-indigo-400 h-full"></div></div>
+        </div>
+        <div>
+          <div class="flex justify-between mb-1"><span>4. 시장 공포 & 선물 펀딩비 심리</span><span id="m-s4" class="font-bold"></span></div>
+          <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden"><div id="m-b4" class="bg-amber-400 h-full"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentPeriod = '1D';
+    let selectedCatId = null;
+
+    // 기본 데이터 (자동 업데이트 파일 data.json이 생성되면 자동으로 덮어씌워짐)
+    let appData = {
+      updatedAt: "실시간 데이터 연동 대기 중",
+      categories: [
+        {
+          id: "bonds", icon: "💵", name: "채권 · 환율",
+          items: [
+            { ticker: "TLT", name: "미국 20년+ 장기채", price: "$91.2", chg1d: -1.8, chg1w: -3.4, score: 84, s1: 31, s2: 26, s3: 17, s4: 10, comment: "200일 평균선 대비 저렴하며 미국 장기 금리 상단 구간에 진입해 바겐세일 매력도가 높습니다." },
+            { ticker: "IEF", name: "미국 7-10년 중기채", price: "$94.5", chg1d: -0.9, chg1w: -1.9, score: 76, s1: 28, s2: 23, s3: 15, s4: 10, comment: "장기채보다 변동성이 낮으면서 금리 매력이 높은 안정적 적립 구간입니다." },
+            { ticker: "JPY/KRW", name: "엔화 환율 (100엔)", price: "905원", chg1d: -0.4, chg1w: -1.2, score: 74, s1: 27, s2: 22, s3: 15, s4: 10, comment: "최근 3년 환율 박스권 하단에 위치해 분할 환전 매력이 높습니다." },
+            { ticker: "SGOV", name: "미국 초단기채(파킹)", price: "$100.1", chg1d: 0.0, chg1w: 0.1, score: 65, s1: 22, s2: 18, s3: 15, s4: 10, comment: "대기 자금을 안전하게 파킹하며 이자를 받기 좋은 구간입니다." },
+            { ticker: "USD/KRW", name: "달러 환율", price: "1,385원", chg1d: 0.3, chg1w: 1.1, score: 45, s1: 15, s2: 12, s3: 10, s4: 8, comment: "역사적 평균 대비 높은 환율 구간으로 공격적 환전보다 관망이 유리합니다." }
+          ]
+        },
+        {
+          id: "metals", icon: "🥈", name: "귀금속 (금·은)",
+          items: [
+            { ticker: "SLV", name: "은 ETF (Silver)", price: "$27.4", chg1d: -2.4, chg1w: -4.1, score: 79, s1: 28, s2: 24, s3: 17, s4: 10, comment: "금 대비 은의 상대 가격이 역사적 저평가 구간(금/은 비율 80 이상)에 머물러 있습니다." },
+            { ticker: "GLD", name: "금 ETF (Gold)", price: "$218.5", chg1d: -0.3, chg1w: 0.8, score: 62, s1: 20, s2: 18, s3: 14, s4: 10, comment: "지정학 리스크 방어용으로 정액 적립을 유지하기 적합한 구간입니다." }
+          ]
+        },
+        {
+          id: "reits", icon: "🏢", name: "부동산 리츠",
+          items: [
+            { ticker: "O", name: "리얼티 인컴 (월배당)", price: "$53.8", chg1d: -1.1, chg1w: -2.5, score: 73, s1: 26, s2: 21, s3: 16, s4: 10, comment: "주가 조정으로 월배당 수익률이 5.7%대로 올라와 배당 적립 매력이 켜졌습니다." },
+            { ticker: "VNQ", name: "미국 부동산 리츠", price: "$84.2", chg1d: -0.8, chg1w: -1.6, score: 64, s1: 22, s2: 19, s3: 14, s4: 9, comment: "금리 인하 사이클을 기다리며 평소대로 모아가는 중립 구간입니다." },
+            { ticker: "476800.KS", name: "한국 리츠 인프라", price: "4,620원", chg1d: -0.2, chg1w: -0.6, score: 68, s1: 24, s2: 20, s3: 15, s4: 9, comment: "안정적인 배당 흐름을 바탕으로 분할 적립하기 무난한 위치입니다." }
+          ]
+        },
+        {
+          id: "commodities", icon: "🛢️", name: "원자재 (유가·구리)",
+          items: [
+            { ticker: "USO", name: "WTI 원유 ETF", price: "$71.4", chg1d: -1.9, chg1w: -3.2, score: 67, s1: 24, s2: 20, s3: 14, s4: 9, comment: "최근 가격 박스권 중하단에 진입하여 인플레이션 헤지용 분할 접근이 가능합니다." },
+            { ticker: "CPER", name: "구리 ETF (닥터코퍼)", price: "$26.1", chg1d: -0.7, chg1w: -1.4, score: 58, s1: 20, s2: 17, s3: 12, s4: 9, comment: "실물 경기 흐름에 맞춰 정액 적립을 유지하는 중립 구간입니다." }
+          ]
+        },
+        {
+          id: "stocks", icon: "📈", name: "주식 (미·한)",
+          items: [
+            { ticker: "SCHD", name: "미국 배당다우존스", price: "$28.1", chg1d: -0.4, chg1w: -0.9, score: 71, s1: 25, s2: 20, s3: 16, s4: 10, comment: "기술주 변동성 장세 속에서도 배당 매력과 가치주 방어력이 돋보이는 초록불 구간입니다." },
+            { ticker: "SOXX", name: "미국 반도체 ETF", price: "$215.0", chg1d: -2.9, chg1w: -5.4, score: 64, s1: 22, s2: 21, s3: 12, s4: 9, comment: "단기 급락으로 과매도권에 근접했으나 변동성을 고려해 분할로 접근하세요." },
+            { ticker: "KOSPI", name: "한국 코스피 지수", price: "2,580", chg1d: -0.8, chg1w: -2.1, score: 63, s1: 23, s2: 19, s3: 13, s4: 8, comment: "역사적 PBR 하단 부근으로 저평가 영역이나 환율 안정 여부를 함께 체크하세요." },
+            { ticker: "SPY", name: "미국 S&P 500", price: "$578.0", chg1d: -0.5, chg1w: 0.4, score: 46, s1: 15, s2: 13, s3: 10, s4: 8, comment: "장기 평균선 위에 위치해 있어 무리한 추격보다 정해진 적립식만 유지하세요." },
+            { ticker: "QQQ", name: "미국 나스닥 100", price: "$492.0", chg1d: 1.8, chg1w: 3.1, score: 34, s1: 10, s2: 9, s3: 8, s4: 7, comment: "단기 과열 구간입니다. 추격 매수는 참아 보고 초록불 자산을 먼저 점검하세요." }
+          ]
+        },
+        {
+          id: "crypto", icon: "🪙", name: "크립토 (코인)",
+          items: [
+            { ticker: "ETH", name: "이더리움 (Ethereum)", price: "$2,540", chg1d: -1.5, chg1w: -3.8, score: 66, s1: 24, s2: 20, s3: 13, s4: 9, comment: "비트코인 대비 상대적 소외도가 높아 분할 적립 가성비가 양호합니다." },
+            { ticker: "BTC", name: "비트코인 (Bitcoin)", price: "$68,200", chg1d: 2.2, chg1w: 4.5, score: 42, s1: 14, s2: 12, s3: 9, s4: 7, comment: "장기 추세선 상단 부근으로 정해진 적립식 외 과도한 추격 매수는 자제할 구간입니다." },
+            { ticker: "SOL", name: "솔라나 (Solana)", price: "$174.0", chg1d: 3.5, chg1w: 6.8, score: 31, s1: 9, s2: 8, s3: 8, s4: 6, comment: "단기 급등과 선물 롱 펀딩비 과열이 겹쳐 있습니다. 눌림목을 기다리세요." }
+          ]
+        }
+      ],
+      ratios: [
+        { title: "금 vs 은 (Gold/Silver 비율)", winner: "은(SLV) 압도적 저평가", desc: "현재 비율 82.4 (80 이상이면 역사적 은 세일 구간)", pct: 82 },
+        { title: "주식 vs 채권 (SPY vs TLT)", winner: "채권(TLT) 상대 매력 우위", desc: "고금리 구간 진입으로 주식 대비 채권 안전마진 확대", pct: 76 }
+      ]
+    };
+
+    function getSignalInfo(score) {
+      if (score >= 70) return { label: "🟢 지금 사요!", cls: "bg-emerald-500/20 text-emerald-300 border-emerald-500/40", textCls: "text-emerald-400" };
+      if (score >= 40) return { label: "🟡 나눠 사요", cls: "bg-amber-500/20 text-amber-300 border-amber-500/40", textCls: "text-amber-400" };
+      return { label: "🔴 참아 봐요!", cls: "bg-rose-500/20 text-rose-300 border-rose-500/40", textCls: "text-rose-400" };
+    }
+
+    function getAllItems() {
+      const list = [];
+      appData.categories.forEach(c => {
+        c.items.forEach(it => list.push({ ...it, catName: c.name, catIcon: c.icon }));
+      });
+      return list;
+    }
+
+    function renderAll() {
+      document.getElementById('update-time').textContent = appData.updatedAt;
+
+      // 최상단 TOP 2 저평가 자산 자동 추출
+      const sortedByScore = getAllItems().sort((a, b) => b.score - a.score);
+      if (sortedByScore.length >= 2) {
+        document.getElementById('top-summary').innerHTML =
+          `오늘 가장 싼 자산: <span class="text-emerald-400 font-extrabold">${sortedByScore[0].name}(${sortedByScore[0].score}점)</span> · <span class="text-emerald-400 font-extrabold">${sortedByScore[1].name}(${sortedByScore[1].score}점)</span>`;
+      }
+
+      renderMovers();
+      renderCategories();
+      renderRatios();
+    }
+
+    function setPeriod(p) {
+      currentPeriod = p;
+      document.getElementById('btn-1d').className = p === '1D' ? "px-2.5 py-1 rounded-md font-bold bg-sky-500 text-slate-950" : "px-2.5 py-1 rounded-md font-semibold text-slate-400";
+      document.getElementById('btn-1w').className = p === '1W' ? "px-2.5 py-1 rounded-md font-bold bg-sky-500 text-slate-950" : "px-2.5 py-1 rounded-md font-semibold text-slate-400";
+      renderMovers();
+    }
+
+    function renderMovers() {
+      const key = currentPeriod === '1D' ? 'chg1d' : 'chg1w';
+      const all = getAllItems();
+      const drops = [...all].sort((a, b) => a[key] - b[key]).slice(0, 3);
+      const rises = [...all].sort((a, b) => b[key] - a[key]).slice(0, 2);
+
+      let html = `<span class="font-bold text-sky-400 mr-1">💧 세일 속보:</span>`;
+      drops.forEach(d => {
+        html += `<button onclick="openModal('${d.ticker}')" class="bg-sky-950/80 hover:bg-sky-900 border border-sky-500/40 text-sky-200 px-2.5 py-1 rounded-full font-semibold transition">${d.ticker} ${d[key]}%</button>`;
+      });
+      html += `<span class="font-bold text-rose-400 ml-2 mr-1">🔥 과열 주의:</span>`;
+      rises.forEach(r => {
+        const sign = r[key] > 0 ? '+' : '';
+        html += `<button onclick="openModal('${r.ticker}')" class="bg-rose-950/80 hover:bg-rose-900 border border-rose-500/40 text-rose-200 px-2.5 py-1 rounded-full font-semibold transition">${r.ticker} ${sign}${r[key]}%</button>`;
+      });
+      document.getElementById('mover-pills').innerHTML = html;
+    }
+
+    function renderCategories() {
+      const grid = document.getElementById('category-grid');
+      let html = '';
+      appData.categories.forEach(cat => {
+        const avgScore = Math.round(cat.items.reduce((s, i) => s + i.score, 0) / cat.items.length);
+        const sig = getSignalInfo(avgScore);
+        const activeBorder = selectedCatId === cat.id ? 'border-sky-400 ring-2 ring-sky-400/30' : 'border-slate-800';
+        html += `
+          <button onclick="openCategory('${cat.id}')" class="card-hover bg-slate-900 border ${activeBorder} rounded-2xl p-4 text-left flex flex-col justify-between h-32">
+            <div class="text-sm font-bold text-slate-200">${cat.icon} ${cat.name}</div>
+            <div class="text-3xl font-extrabold ${sig.textCls} my-1">${avgScore}<span class="text-sm font-normal text-slate-400">점</span></div>
+            <div><span class="text-xs font-extrabold px-2.5 py-1 rounded-full border ${sig.cls}">${sig.label}</span></div>
+          </button>
+        `;
+      });
+      grid.innerHTML = html;
+    }
+
+    function openCategory(catId) {
+      selectedCatId = catId;
+      renderCategories();
+      const cat = appData.categories.find(c => c.id === catId);
+      if (!cat) return;
+      document.getElementById('drawer-title').textContent = `${cat.icon} ${cat.name} 세부 종목`;
+      renderDrawerItems(cat.items);
+      document.getElementById('drawer-section').classList.remove('hidden');
+      document.getElementById('drawer-section').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function filterGreenOnly() {
+      selectedCatId = null;
+      renderCategories();
+      const greens = getAllItems().filter(i => i.score >= 70).sort((a, b) => b.score - a.score);
+      document.getElementById('drawer-title').textContent = `🟢 전 자산 '지금 사요!' (70점 이상) 종목 모아보기`;
+      renderDrawerItems(greens);
+      document.getElementById('drawer-section').classList.remove('hidden');
+      document.getElementById('drawer-section').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function renderDrawerItems(items) {
+      let html = '';
+      items.forEach(it => {
+        const sig = getSignalInfo(it.score);
+        const chgColor = it.chg1d < 0 ? 'text-sky-400' : 'text-rose-400';
+        const sign = it.chg1d > 0 ? '+' : '';
+        html += `
+          <div onclick="openModal('${it.ticker}')" class="cursor-pointer bg-slate-950/70 hover:bg-slate-800/80 border border-slate-800 rounded-xl px-3.5 py-3 flex items-center justify-between transition">
+            <div>
+              <span class="font-extrabold text-white text-sm">${it.ticker}</span>
+              <span class="text-xs text-slate-400 ml-1.5">${it.name}</span>
+            </div>
+            <div class="flex items-center gap-3">
+              <span class="text-xs text-slate-300 hidden sm:inline">${it.price} <span class="${chgColor}">(${sign}${it.chg1d}%)</span></span>
+              <span class="text-sm font-extrabold ${sig.textCls}">${it.score}점</span>
+              <span class="text-xs font-bold px-2.5 py-1 rounded-full border ${sig.cls}">${sig.label}</span>
+            </div>
+          </div>
+        `;
+      });
+      document.getElementById('drawer-list').innerHTML = html;
+    }
+
+    function closeDrawer() {
+      selectedCatId = null;
+      renderCategories();
+      document.getElementById('drawer-section').classList.add('hidden');
+    }
+
+    function renderRatios() {
+      let html = '';
+      appData.ratios.forEach(r => {
+        html += `
+          <div class="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3">
+            <div class="flex justify-between font-bold mb-1">
+              <span class="text-slate-300">${r.title}</span>
+              <span class="text-emerald-400">${r.winner}</span>
+            </div>
+            <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden my-1.5">
+              <div class="bg-emerald-400 h-full" style="width:${r.pct}%"></div>
+            </div>
+            <p class="text-slate-400 text-[11px]">${r.desc}</p>
+          </div>
+        `;
+      });
+      document.getElementById('ratios-list').innerHTML = html;
+    }
+
+    function openModal(ticker) {
+      const it = getAllItems().find(x => x.ticker === ticker);
+      if (!it) return;
+      const sig = getSignalInfo(it.score);
+      document.getElementById('modal-cat').textContent = `${it.catIcon} ${it.catName}`;
+      document.getElementById('modal-name').textContent = `${it.ticker} — ${it.name}`;
+      document.getElementById('modal-price').textContent = `현재가: ${it.price} (오늘 ${it.chg1d > 0 ? '+' : ''}${it.chg1d}% / 주간 ${it.chg1w > 0 ? '+' : ''}${it.chg1w}%)`;
+      document.getElementById('modal-score').textContent = `${it.score}점`;
+      document.getElementById('modal-score').className = `text-2xl font-extrabold ${sig.textCls}`;
+      document.getElementById('modal-signal').textContent = sig.label;
+      document.getElementById('modal-signal').className = `text-xs font-extrabold px-3 py-1 rounded-full border ${sig.cls}`;
+      document.getElementById('modal-badge-box').className = `p-3 rounded-xl border flex items-center justify-between bg-slate-950 border-slate-800`;
+      document.getElementById('modal-comment').textContent = it.comment;
+
+      document.getElementById('m-s1').textContent = `${it.s1} / 35점`;
+      document.getElementById('m-b1').style.width = `${(it.s1/35)*100}%`;
+      document.getElementById('m-s2').textContent = `${it.s2} / 30점`;
+      document.getElementById('m-b2').style.width = `${(it.s2/30)*100}%`;
+      document.getElementById('m-s3').textContent = `${it.s3} / 20점`;
+      document.getElementById('m-b3').style.width = `${(it.s3/20)*100}%`;
+      document.getElementById('m-s4').textContent = `${it.s4} / 15점`;
+      document.getElementById('m-b4').style.width = `${(it.s4/15)*100}%`;
+
+      document.getElementById('score-modal').classList.remove('hidden');
+    }
+
+    function closeModal() {
+      document.getElementById('score-modal').classList.add('hidden');
+    }
+
+    // 외부 자동 업데이트 파일(data.json)이 있으면 자동으로 불러오기
+    fetch('./data.json?t=' + Date.now())
+      .then(res => res.ok ? res.json() : null)
+      .then(json => { if (json && json.categories) { appData = json; renderAll(); } })
+      .catch(() => {});
+
+    renderAll();
+  </script>
+</body>
+</html>
