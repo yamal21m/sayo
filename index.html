@@ -24,8 +24,13 @@
         </div>
         <p class="text-sm font-bold text-sky-400 mt-0.5">"그래서 지금 사요?" <span class="text-xs font-normal text-slate-400">— 6대 자산 바겐세일 신호등</span></p>
       </div>
-      <div class="text-right">
+      <div class="text-right flex flex-col items-end gap-1.5">
         <span id="update-time" class="text-xs text-slate-400 bg-slate-800 px-2.5 py-1 rounded-full">자동 업데이트 연동됨</span>
+        <div id="visitor-stats" class="text-[11px] text-slate-400 flex items-center gap-1.5 font-medium pr-1">
+          <span>오늘 <strong id="visitor-today" class="text-slate-300 font-semibold">-</strong></span>
+          <span class="text-slate-600">·</span>
+          <span>누적 <strong id="visitor-total" class="text-slate-300 font-semibold">-</strong></span>
+        </div>
       </div>
     </div>
   </header>
@@ -364,6 +369,24 @@
     fetch('./data.json?t=' + Date.now())
       .then(res => res.ok ? res.json() : null)
       .then(json => { if (json && json.categories) { appData = json; renderAll(); } })
+      .catch(() => {});
+
+    // 방문자 수 카운터 (오늘 / 누적)
+    const siteUrl = window.location.origin && window.location.origin.startsWith('http')
+      ? window.location.origin + window.location.pathname
+      : 'https://sayo-umber.vercel.app';
+    fetch('https://counter.itjustbong.workers.dev/visit?url=' + encodeURIComponent(siteUrl))
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data && data.today !== undefined && data.total !== undefined) {
+          const elToday = document.getElementById('visitor-today');
+          const elTotal = document.getElementById('visitor-total');
+          if (elToday && elTotal) {
+            elToday.textContent = Number(data.today).toLocaleString();
+            elTotal.textContent = Number(data.total).toLocaleString();
+          }
+        }
+      })
       .catch(() => {});
 
     renderAll();
