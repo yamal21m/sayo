@@ -1,4 +1,5 @@
 import json
+import math
 import os
 import re
 import time
@@ -19,6 +20,10 @@ def load_previous_state():
       "fng_label": "Neutral",
       "items": {},
       "kimchi": None,
+      "usFng": None,
+      "vix": None,
+      "move": None,
+      "kospiVol": None,
   }
   if not os.path.exists("data.json"):
     return empty
@@ -49,6 +54,10 @@ def load_previous_state():
         "fng_label": prev_fng_label,
         "items": prev_items,
         "kimchi": prev_market.get("kimchi"),
+        "usFng": prev_market.get("usFng"),
+        "vix": prev_market.get("vix"),
+        "move": prev_market.get("move"),
+        "kospiVol": prev_market.get("kospiVol"),
     }
   except Exception as e:
     print(f"Warning: could not read previous data.json: {e}")
@@ -240,6 +249,217 @@ def get_kimchi_premium(prev=None):
   }
 
 
+# 2-3. 미국 주식 공포·탐욕 지수(CNN Fear & Greed) — 무료 공개 JSON, 키·가입 불필요
+#   CNN 데이터 허브(production.dataviz.cnn.io)가 브라우저 User-Agent 로 응답합니다.
+#   점수는 0~100 (0 = 극단적 공포, 100 = 극단적 탐색). 실패하면 직전값 유지
+CNN_FNG_URL = "https://production.dataviz.cnn.io/index/fearandgreed/graphdata"
+CNN_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        " (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+    ),
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Referer": "https://edition.cnn.com/markets/fear-and-greed",
+}
+
+CNN_RATINGS_KO = {
+    "extreme fear": "극단적 공포",
+    "fear": "공포",
+    "neutral": "중립",
+    "greed": "탐욕",
+    "extreme greed": "극단적 탐욕",
+}
+
+# CNN이 공개하는 7개 구성 지표 (한국어 표기)
+CNN_COMPONENTS = [
+    ("market_momentum_sp500", "S&P500 모멘텀"),
+    ("stock_price_strength", "주가 강도(52주 신고가)"),
+    ("stock_price_breadth", "시장 폭(상승 종목)"),
+    ("put_call_options", "풋/콜 옵션"),
+    ("market_volatility_vix", "VIX 변동성"),
+    ("junk_bond_demand", "정크본드 수요"),
+    ("safe_haven_demand", "안전자산 선호"),
+]
+
+
+def _num(value):
+  """숫자로 쓸 수 있는 값만 float 로 돌려줍니다(문자열·None 방어)."""
+  try:
+    f = float(value)
+    return f if math.isfinite(f) else None
+  except (TypeError, ValueError):
+    return None
+
+
+def get_cnn_fear_greed(prev=None, max_retries=3):
+  """미국 주식 CNN 공포·탐욕 지수와 구성 지표 7종을 가져옵니다."""
+  for attempt in range(1, max_retries + 1):
+    try:
+      req = urllib.request.Request(CNN_FNG_URL, headers=CNN_HEADERS)
+      with urllib.request.urlopen(req, timeout=15) as res:
+        data = json.loads(res.read().decode("utf-8"))
+
+      block = data.get("fear_and_greed") or {}
+      score = _num(block.get("score"))
+      if score is None:
+        raise ValueError("fear_and_greed.score missing")
+
+      rating = str(block.get("rating") or "").strip().lower()
+
+      components = []
+      for key, name in CNN_COMPONENTS:
+        part = data.get(key) or {}
+        c_score = _num(part.get("score"))
+        if c_score is None:
+          continue
+        c_rating = str(part.get("rating") or "").strip().lower()
+        components.append({
+            "key": key,
+            "name": name,
+            "score": round(c_score, 1),
+            "rating": c_rating,
+            "labelKo": CNN_RATINGS_KO.get(c_rating, c_rating),
+        })
+
+      # 풋/콜 옵션 최신 관측치 (CNN 집계값)
+      put_call = None
+      pc_part = data.get("put_call_options") or {}
+      pc_points = pc_part.get("data") or []
+      if pc_points:
+        pc_value = _num(pc_points[-1].get("y"))
+        if pc_value is not None:
+          pc_rating = str(pc_part.get("rating") or "").strip().lower()
+          put_call = {
+              "value": round(pc_value, 2),
+              "score": round(_num(pc_part.get("score")) or 0, 1),
+              "rating": pc_rating,
+              "labelKo": CNN_RATINGS_KO.get(pc_rating, pc_rating),
+          }
+
+      def _round(key):
+        v = _num(block.get(key))
+        return round(v, 1) if v is not None else None
+
+      return {
+          "value": round(score, 1),
+          "label": block.get("rating") or "",
+          "labelKo": CNN_RATINGS_KO.get(rating, block.get("rating") or ""),
+          "timestamp": block.get("timestamp"),
+          "previousClose": _round("previous_close"),
+          "previous1Week": _round("previous_1_week"),
+          "previous1Month": _round("previous_1_month"),
+          "previous1Year": _round("previous_1_year"),
+          "components": components,
+          "putCall": put_call,
+          "source": "CNN Fear & Greed",
+      }
+    except Exception as e:
+      print(
+          f"CNN Fear & Greed fetch attempt {attempt}/{max_retries} failed: {e}"
+      )
+      if attempt < max_retries:
+        time.sleep(2 * attempt)
+
+  if prev:
+    print("Warning: CNN Fear & Greed failed. Retaining previous value.")
+  else:
+    print("Warning: CNN Fear & Greed failed and no previous value exists.")
+  return prev
+
+
+# 2-4. 변동성·채권 심리 지수 (yfinance 무료 시세)
+#   ^VIX = CBOE S&P500 변동성, ^MOVE = ICE BofA 미국 국채 변동성(MOVE)
+VIX_LEVELS = [
+    (12, "극도의 안심"),
+    (16, "안정"),
+    (20, "보통"),
+    (25, "긴장"),
+    (30, "공포"),
+    (999, "극단적 공포"),
+]
+MOVE_LEVELS = [
+    (70, "안정"),
+    (90, "보통"),
+    (110, "긴장"),
+    (130, "불안"),
+    (999, "공포"),
+]
+KOSPI_VOL_LEVELS = [
+    (12, "안정"),
+    (18, "보통"),
+    (25, "긴장"),
+    (999, "공포"),
+]
+
+
+def _level_label(value, levels):
+  for limit, label in levels:
+    if value < limit:
+      return label
+  return levels[-1][1]
+
+
+def get_index_snapshot(yf_ticker, prev=None, max_retries=2):
+  """지수 최근 종가·전일 대비·주간 대비를 가져옵니다(실패 시 직전값 유지)."""
+  for attempt in range(1, max_retries + 1):
+    try:
+      hist = yf.Ticker(yf_ticker).history(period="2mo")
+      closes = hist["Close"].dropna().tolist()
+      if len(closes) < 2:
+        raise ValueError("history too short")
+      curr = float(closes[-1])
+      prev_1d = float(closes[-2])
+      prev_1w = float(closes[-6]) if len(closes) >= 6 else float(closes[0])
+      return {
+          "value": round(curr, 2),
+          "chg1d": round((curr - prev_1d) / prev_1d * 100, 2),
+          "chg1w": round((curr - prev_1w) / prev_1w * 100, 2),
+          "asof": str(hist.index[-1].date()),
+      }
+    except Exception as e:
+      print(
+          f"Index snapshot {yf_ticker} attempt {attempt}/{max_retries} failed:"
+          f" {e}"
+      )
+      if attempt < max_retries:
+        time.sleep(1.5 * attempt)
+  return prev
+
+
+def get_kospi_realized_vol(prev=None, max_retries=2):
+  """국장 변동성: 코스피 일간 종가 20거래일 실현변동성(연율 %).
+
+  VKOSPI(코스피200 변동성지수)는 무료 공개 API가 없어, 같은 의미의
+  변동성 수치를 실제 코스피 종가로 계산합니다(추정값 아님).
+  """
+  for attempt in range(1, max_retries + 1):
+    try:
+      hist = yf.Ticker("^KS11").history(period="3mo")
+      closes = [float(c) for c in hist["Close"].dropna().tolist()]
+      if len(closes) < 22:
+        raise ValueError("history too short")
+      rets = [
+          math.log(closes[i] / closes[i - 1]) for i in range(1, len(closes))
+      ][-20:]
+      mean = sum(rets) / len(rets)
+      var = sum((r - mean) ** 2 for r in rets) / (len(rets) - 1)
+      vol = math.sqrt(var * 252) * 100
+      return {
+          "value": round(vol, 2),
+          "chg1d": round((closes[-1] - closes[-2]) / closes[-2] * 100, 2),
+          "kospi": round(closes[-1], 2),
+          "asof": str(hist.index[-1].date()),
+      }
+    except Exception as e:
+      print(
+          f"KOSPI realized vol attempt {attempt}/{max_retries} failed: {e}"
+      )
+      if attempt < max_retries:
+        time.sleep(1.5 * attempt)
+  return prev
+
+
 # 3. RSI(14) 계산 함수
 def calc_rsi(closes, period=14):
   if len(closes) < period + 1:
@@ -387,6 +607,21 @@ def main():
   fng = fng_info["value"]
   kimchi = get_kimchi_premium(prev_state.get("kimchi"))
   hl_funding = get_hl_funding()
+
+  # 시장 온도계: 미장 CNN 공포·탐욕 + VIX + 채권 MOVE + 국장 변동성
+  us_fng = get_cnn_fear_greed(prev_state.get("usFng"))
+
+  vix = get_index_snapshot("^VIX", prev_state.get("vix"))
+  if vix and "value" in vix:
+    vix["labelKo"] = _level_label(vix["value"], VIX_LEVELS)
+
+  move = get_index_snapshot("^MOVE", prev_state.get("move"))
+  if move and "value" in move:
+    move["labelKo"] = _level_label(move["value"], MOVE_LEVELS)
+
+  kospi_vol = get_kospi_realized_vol(prev_state.get("kospiVol"))
+  if kospi_vol and "value" in kospi_vol:
+    kospi_vol["labelKo"] = _level_label(kospi_vol["value"], KOSPI_VOL_LEVELS)
 
   config = [
       (
@@ -583,6 +818,10 @@ def main():
   market = {
       "kimchi": kimchi,
       "cryptoFng": fng_info,
+      "usFng": us_fng,
+      "vix": vix,
+      "move": move,
+      "kospiVol": kospi_vol,
   }
 
   output = {
@@ -609,6 +848,24 @@ def main():
         f" {kimchi['usdKrw']} KRW ({kimchi['fxSource']})"
     )
   print(f"Crypto Fear & Greed: {fng} ({fng_info['labelKo']})")
+  if us_fng:
+    print(
+        "US (CNN) Fear & Greed:"
+        f" {us_fng['value']} ({us_fng['labelKo']}) · components"
+        f" {len(us_fng.get('components') or [])}개"
+    )
+  else:
+    print("Warning: US Fear & Greed value unavailable this run.")
+  if vix:
+    print(f"VIX: {vix['value']} ({vix.get('labelKo')}) as of {vix.get('asof')}")
+  if move:
+    print(f"MOVE: {move['value']} ({move.get('labelKo')}) as of {move.get('asof')}")
+  if kospi_vol:
+    print(
+        "KOSPI 20d realized vol:"
+        f" {kospi_vol['value']}% ({kospi_vol.get('labelKo')}) as of"
+        f" {kospi_vol.get('asof')}"
+    )
 
 
 if __name__ == "__main__":

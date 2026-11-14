@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026.11.14 20:49 업데이트",
+  "updatedAt": "2026.11.14 21:03 업데이트",
   "categories": [
     {
       "id": "bonds",
@@ -265,9 +265,9 @@
         {
           "ticker": "ETH",
           "name": "이더리움 (Ethereum)",
-          "price": "$1,909",
-          "chg1d": -0.9,
-          "chg1w": -10.4,
+          "price": "$1,908",
+          "chg1d": -1.0,
+          "chg1w": -10.5,
           "score": 96,
           "s1": 35,
           "s2": 30,
@@ -278,11 +278,11 @@
         {
           "ticker": "BTC",
           "name": "비트코인 (Bitcoin)",
-          "price": "$67,214",
+          "price": "$67,207",
           "chg1d": -1.5,
-          "chg1w": -10.6,
-          "score": 89,
-          "s1": 31,
+          "chg1w": -10.7,
+          "score": 90,
+          "s1": 32,
           "s2": 30,
           "s3": 15,
           "s4": 13,
@@ -294,11 +294,11 @@
           "price": "$75.9",
           "chg1d": -2.8,
           "chg1w": -12.3,
-          "score": 95,
+          "score": 97,
           "s1": 35,
           "s2": 30,
           "s3": 17,
-          "s4": 13,
+          "s4": 15,
           "comment": "200일 평균선 대비 유리한 구간이며 고점 대비 -48.3% 할인 중입니다. 장기 적립 비중을 늘리기 좋은 초록불 구간입니다."
         }
       ]
@@ -344,9 +344,9 @@
   ],
   "market": {
     "kimchi": {
-      "premium": 2.49,
-      "upbitKrw": 92069000,
-      "overseasUsd": 67229.62,
+      "premium": 2.5,
+      "upbitKrw": 92061000,
+      "overseasUsd": 67216.63,
       "usdKrw": 1336.18,
       "usdSource": "Coinbase",
       "fxSource": "open.er-api.com"
@@ -355,6 +355,95 @@
       "value": 13,
       "label": "Extreme Fear",
       "labelKo": "극단적 공포"
+    },
+    "usFng": {
+      "value": 38.6,
+      "label": "fear",
+      "labelKo": "공포",
+      "timestamp": "2026-11-13T23:59:56+00:00",
+      "previousClose": 39.8,
+      "previous1Week": 24.4,
+      "previous1Month": 45.6,
+      "previous1Year": 24.5,
+      "components": [
+        {
+          "key": "market_momentum_sp500",
+          "name": "S&P500 모멘텀",
+          "score": 14.6,
+          "rating": "extreme fear",
+          "labelKo": "극단적 공포"
+        },
+        {
+          "key": "stock_price_strength",
+          "name": "주가 강도(52주 신고가)",
+          "score": 44.2,
+          "rating": "fear",
+          "labelKo": "공포"
+        },
+        {
+          "key": "stock_price_breadth",
+          "name": "시장 폭(상승 종목)",
+          "score": 52.2,
+          "rating": "neutral",
+          "labelKo": "중립"
+        },
+        {
+          "key": "put_call_options",
+          "name": "풋/콜 옵션",
+          "score": 25.6,
+          "rating": "fear",
+          "labelKo": "공포"
+        },
+        {
+          "key": "market_volatility_vix",
+          "name": "VIX 변동성",
+          "score": 50.0,
+          "rating": "neutral",
+          "labelKo": "중립"
+        },
+        {
+          "key": "junk_bond_demand",
+          "name": "정크본드 수요",
+          "score": 62.4,
+          "rating": "greed",
+          "labelKo": "탐욕"
+        },
+        {
+          "key": "safe_haven_demand",
+          "name": "안전자산 선호",
+          "score": 21.2,
+          "rating": "extreme fear",
+          "labelKo": "극단적 공포"
+        }
+      ],
+      "putCall": {
+        "value": 0.8,
+        "score": 25.6,
+        "rating": "fear",
+        "labelKo": "공포"
+      },
+      "source": "CNN Fear & Greed"
+    },
+    "vix": {
+      "value": 19.3,
+      "chg1d": 3.21,
+      "chg1w": -24.73,
+      "asof": "2026-11-13",
+      "labelKo": "보통"
+    },
+    "move": {
+      "value": 98.79,
+      "chg1d": 0.37,
+      "chg1w": 0.89,
+      "asof": "2026-11-13",
+      "labelKo": "긴장"
+    },
+    "kospiVol": {
+      "value": 53.9,
+      "chg1d": -0.98,
+      "kospi": 5290.53,
+      "asof": "2026-11-13",
+      "labelKo": "공포"
     }
   }
 }
