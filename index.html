@@ -748,7 +748,7 @@
         return;
       }
 
-      const lv = cnLevel(cfg.kind, v);
+      const lv = cfg.levelFn ? cfg.levelFn(obj, v) : cnLevel(cfg.kind, v);
       valEl.textContent = v.toFixed(cfg.digits);
       valEl.className = 'text-3xl font-extrabold leading-none ' + lv.tone.text;
       badge.textContent = lv.label;
@@ -777,9 +777,14 @@
           + '<span class="text-slate-500">VKOSPI 공식 지수는 무료 공개 API가 없어, 코스피 종가 20거래일 변동성(연율)으로 계산합니다.</span>'
       });
 
-      const pc = (m.usFng && m.usFng.putCall) ? m.usFng.putCall : null;
+      const us = m.usFng || {};
+      const pc = us.putCall
+        ? Object.assign({ asof: us.timestamp ? String(us.timestamp).slice(0, 10) : null }, us.putCall)
+        : null;
       renderLevelCard('pc', pc, {
         kind: 'pc', min: 0.4, max: 1.4, digits: 2,
+        // 비율 자체보다 CNN이 1년 범위로 환산한 점수를 기준으로 등급을 보여 줍니다.
+        levelFn: (o, raw) => (o.labelKo ? { label: o.labelKo, tone: fngTone(Number(o.score)) } : cnLevel('pc', raw)),
         detail: o => 'CNN 풋/콜 점수 ' + Number(o.score).toFixed(1) + '점 · 1.00을 넘으면 하락 베팅(풋)이 우세합니다.'
           + '<br><span class="text-slate-500">풋옵션 비중이 커질수록 대중이 하락을 두려워한다는 뜻입니다.</span>'
       });
