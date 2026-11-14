@@ -50,7 +50,43 @@
       </button>
     </div>
 
-    <!-- 0단: 시장 온도계 (김치 프리미엄 + 크립토 공포·탐욕) -->
+    <!-- 1단: 일간/주간 급락·급등 알약 티커 -->
+    <section class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4">
+      <div class="flex items-center justify-between mb-3">
+        <span class="text-xs font-bold text-slate-400">⚡ 이상 징후 레이더 (클릭 시 상세)</span>
+        <div class="inline-flex bg-slate-800 rounded-lg p-0.5 text-xs">
+          <button id="btn-1d" onclick="setPeriod('1D')" class="px-2.5 py-1 rounded-md font-bold bg-sky-500 text-slate-950">오늘(1D)</button>
+          <button id="btn-1w" onclick="setPeriod('1W')" class="px-2.5 py-1 rounded-md font-semibold text-slate-400">이번 주(1W)</button>
+        </div>
+      </div>
+      <div class="flex flex-wrap items-center gap-2 text-xs" id="mover-pills"></div>
+    </section>
+
+    <!-- 2단: 6대 자산 미니멀 신호등 카드 (2x3 그리드) -->
+    <section>
+      <div class="flex items-center justify-between mb-2.5">
+        <h2 class="text-sm font-bold text-slate-300">🚦 6대 자산 대표 신호등 <span class="text-xs font-normal text-slate-500">(카드를 누르면 세부 종목이 열립니다)</span></h2>
+      </div>
+      <div id="category-grid" class="grid grid-cols-2 sm:grid-cols-3 gap-3"></div>
+    </section>
+
+    <!-- 3단: 클릭 시 열리는 세부 종목 서랍 -->
+    <section id="drawer-section" class="hidden bg-slate-900 border border-sky-500/40 rounded-2xl p-4 shadow-xl">
+      <div class="flex items-center justify-between pb-3 mb-3 border-b border-slate-800">
+        <h3 id="drawer-title" class="text-base font-extrabold text-white">세부 종목</h3>
+        <button onclick="closeDrawer()" class="text-xs text-slate-400 hover:text-white px-2 py-1 rounded bg-slate-800">접기 ▲</button>
+      </div>
+      <p class="text-xs text-slate-400 mb-3">👇 종목을 한 번 더 누르면 100점 만점 채점 근거가 뜹니다.</p>
+      <div id="drawer-list" class="space-y-2"></div>
+    </section>
+
+    <!-- 4단: 상대 가성비 판독기 -->
+    <section class="bg-slate-900/70 border border-slate-800 rounded-2xl p-4">
+      <h2 class="text-sm font-bold text-slate-300 mb-3">⚖️ 둘 중 뭐가 더 쌀까? (상대 가성비)</h2>
+      <div id="ratios-list" class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs"></div>
+    </section>
+
+    <!-- 5단: 시장 온도계 (김치 프리미엄 + 크립토 공포·탐욕) — 페이지 맨 아래 -->
     <section class="grid grid-cols-1 sm:grid-cols-2 gap-3">
 
       <!-- 김치 프리미엄 (BTC) -->
@@ -89,42 +125,6 @@
         <p id="fng-detail" class="text-[11px] text-slate-400 mt-2 leading-relaxed">alternative.me의 비트코인 중심 크립토 심리 지수입니다.</p>
       </div>
 
-    </section>
-
-    <!-- 1단: 일간/주간 급락·급등 알약 티커 -->
-    <section class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4">
-      <div class="flex items-center justify-between mb-3">
-        <span class="text-xs font-bold text-slate-400">⚡ 이상 징후 레이더 (클릭 시 상세)</span>
-        <div class="inline-flex bg-slate-800 rounded-lg p-0.5 text-xs">
-          <button id="btn-1d" onclick="setPeriod('1D')" class="px-2.5 py-1 rounded-md font-bold bg-sky-500 text-slate-950">오늘(1D)</button>
-          <button id="btn-1w" onclick="setPeriod('1W')" class="px-2.5 py-1 rounded-md font-semibold text-slate-400">이번 주(1W)</button>
-        </div>
-      </div>
-      <div class="flex flex-wrap items-center gap-2 text-xs" id="mover-pills"></div>
-    </section>
-
-    <!-- 2단: 6대 자산 미니멀 신호등 카드 (2x3 그리드) -->
-    <section>
-      <div class="flex items-center justify-between mb-2.5">
-        <h2 class="text-sm font-bold text-slate-300">🚦 6대 자산 대표 신호등 <span class="text-xs font-normal text-slate-500">(카드를 누르면 세부 종목이 열립니다)</span></h2>
-      </div>
-      <div id="category-grid" class="grid grid-cols-2 sm:grid-cols-3 gap-3"></div>
-    </section>
-
-    <!-- 3단: 클릭 시 열리는 세부 종목 서랍 -->
-    <section id="drawer-section" class="hidden bg-slate-900 border border-sky-500/40 rounded-2xl p-4 shadow-xl">
-      <div class="flex items-center justify-between pb-3 mb-3 border-b border-slate-800">
-        <h3 id="drawer-title" class="text-base font-extrabold text-white">세부 종목</h3>
-        <button onclick="closeDrawer()" class="text-xs text-slate-400 hover:text-white px-2 py-1 rounded bg-slate-800">접기 ▲</button>
-      </div>
-      <p class="text-xs text-slate-400 mb-3">👇 종목을 한 번 더 누르면 100점 만점 채점 근거가 뜹니다.</p>
-      <div id="drawer-list" class="space-y-2"></div>
-    </section>
-
-    <!-- 4단: 상대 가성비 판독기 -->
-    <section class="bg-slate-900/70 border border-slate-800 rounded-2xl p-4">
-      <h2 class="text-sm font-bold text-slate-300 mb-3">⚖️ 둘 중 뭐가 더 쌀까? (상대 가성비)</h2>
-      <div id="ratios-list" class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs"></div>
     </section>
 
   </main>
