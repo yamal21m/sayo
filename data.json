@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026.11.14 20:46 업데이트",
+  "updatedAt": "2026.11.14 20:49 업데이트",
   "categories": [
     {
       "id": "bonds",
@@ -265,9 +265,9 @@
         {
           "ticker": "ETH",
           "name": "이더리움 (Ethereum)",
-          "price": "$1,908",
-          "chg1d": -1.0,
-          "chg1w": -10.5,
+          "price": "$1,909",
+          "chg1d": -0.9,
+          "chg1w": -10.4,
           "score": 96,
           "s1": 35,
           "s2": 30,
@@ -278,13 +278,13 @@
         {
           "ticker": "BTC",
           "name": "비트코인 (Bitcoin)",
-          "price": "$67,187",
-          "chg1d": -1.6,
-          "chg1w": -10.7,
-          "score": 91,
-          "s1": 32,
+          "price": "$67,214",
+          "chg1d": -1.5,
+          "chg1w": -10.6,
+          "score": 89,
+          "s1": 31,
           "s2": 30,
-          "s3": 16,
+          "s3": 15,
           "s4": 13,
           "comment": "200일 평균선 대비 유리한 구간이며 고점 대비 -30.7% 할인 중입니다. 장기 적립 비중을 늘리기 좋은 초록불 구간입니다."
         },
@@ -292,7 +292,7 @@
           "ticker": "SOL",
           "name": "솔라나 (Solana)",
           "price": "$75.9",
-          "chg1d": -2.9,
+          "chg1d": -2.8,
           "chg1w": -12.3,
           "score": 95,
           "s1": 35,
@@ -344,9 +344,9 @@
   ],
   "market": {
     "kimchi": {
-      "premium": 2.48,
-      "upbitKrw": 91996000,
-      "overseasUsd": 67185.32,
+      "premium": 2.49,
+      "upbitKrw": 92069000,
+      "overseasUsd": 67229.62,
       "usdKrw": 1336.18,
       "usdSource": "Coinbase",
       "fxSource": "open.er-api.com"
