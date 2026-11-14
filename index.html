@@ -50,6 +50,47 @@
       </button>
     </div>
 
+    <!-- 0단: 시장 온도계 (김치 프리미엄 + 크립토 공포·탐욕) -->
+    <section class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+
+      <!-- 김치 프리미엄 (BTC) -->
+      <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4">
+        <div class="flex items-center justify-between gap-2">
+          <span class="text-xs font-bold text-slate-400">🧭 김치 프리미엄 <span class="font-normal text-slate-500">(BTC)</span></span>
+          <span id="kimchi-live" class="text-[10px] text-slate-500 bg-slate-800 px-2 py-0.5 rounded-full whitespace-nowrap">불러오는 중…</span>
+        </div>
+        <div class="flex items-end gap-2 mt-1.5">
+          <span id="kimchi-pct" class="text-3xl font-extrabold leading-none text-slate-400">—</span>
+          <span id="kimchi-badge" class="text-[11px] font-extrabold px-2 py-0.5 mb-0.5 rounded-full border border-slate-700 text-slate-400">—</span>
+        </div>
+        <div class="relative h-2.5 rounded-full bg-slate-800 mt-3">
+          <div class="absolute inset-y-0 left-1/2 w-px bg-slate-600"></div>
+          <div id="kimchi-marker" class="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-2.5 h-2.5 rounded-full bg-slate-500 ring-2 ring-slate-900 transition-all" style="left:50%"></div>
+        </div>
+        <div class="flex justify-between text-[10px] text-slate-500 mt-1"><span>-10% 역프</span><span>0</span><span>+10% 김프</span></div>
+        <p id="kimchi-detail" class="text-[11px] text-slate-400 mt-2 leading-relaxed">업비트·해외 시세·환율을 대조하는 중입니다.</p>
+      </div>
+
+      <!-- 크립토 공포·탐욕 지수 -->
+      <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4">
+        <div class="flex items-center justify-between gap-2">
+          <span class="text-xs font-bold text-slate-400">😱 크립토 공포·탐욕 지수</span>
+          <span id="fng-live" class="text-[10px] text-slate-500 bg-slate-800 px-2 py-0.5 rounded-full whitespace-nowrap">불러오는 중…</span>
+        </div>
+        <div class="flex items-end gap-1.5 mt-1.5">
+          <span id="fng-value" class="text-3xl font-extrabold leading-none text-slate-400">—</span>
+          <span class="text-[11px] text-slate-500 mb-1">/ 100</span>
+          <span id="fng-badge" class="text-[11px] font-extrabold px-2 py-0.5 mb-0.5 rounded-full border border-slate-700 text-slate-400 ml-auto">—</span>
+        </div>
+        <div class="relative h-2.5 rounded-full mt-3" style="background:linear-gradient(90deg,#f43f5e 0%,#fb7185 25%,#f59e0b 45%,#facc15 55%,#34d399 75%,#059669 100%)">
+          <div id="fng-marker" class="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-1.5 h-4 rounded-full bg-white ring-2 ring-slate-900 transition-all" style="left:50%"></div>
+        </div>
+        <div class="flex justify-between text-[10px] text-slate-500 mt-1"><span>극단적 공포 0</span><span>중립 50</span><span>극단적 탐욕 100</span></div>
+        <p id="fng-detail" class="text-[11px] text-slate-400 mt-2 leading-relaxed">alternative.me의 비트코인 중심 크립토 심리 지수입니다.</p>
+      </div>
+
+    </section>
+
     <!-- 1단: 일간/주간 급락·급등 알약 티커 -->
     <section class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4">
       <div class="flex items-center justify-between mb-3">
@@ -190,7 +231,7 @@
       ],
       ratios: [
         { title: "금 vs 은 (ETF 상대 비율)", winner: "은(SLV) 저평가 우위", desc: "현재 GLD/SLV 환산비율 79.4 (높을수록 은이 상대적으로 저렴)", pct: 79 },
-        { title: "시장 심리 온도계 (공포·탐욕)", winner: "공포 구간 (매수 유리)", desc: "현재 글로벌 투자 심리 지수 32점 (낮을수록 대중이 공포에 떤 바닥권)", pct: 68 },
+        { title: "크립토 공포·탐욕 지수 (BTC 심리)", winner: "공포 구간 (매수 유리)", desc: "현재 크립토 투자 심리 13점 · 극단적 공포 (alternative.me 기준, 낮을수록 대중이 공포에 떤 바닥권)", pct: 87 },
         { title: "이더 vs 비트 (ETH / BTC 비율)", winner: "이더리움(ETH) 저평가 우위", desc: "현재 ETH/BTC 비율 0.0278 (0.040 이하 시 이더·알트 가성비 바닥 매력)", pct: 82 },
         { title: "장기채 vs 단기채 (TLT / SGOV)", winner: "장기채(TLT) 반등 차익 우위", desc: "현재 TLT/SGOV 비율 0.80 (낮을수록 장기 금리 상단·차익 메리트)", pct: 85 },
         { title: "성장주 vs 배당주 (QQQ / SCHD)", winner: "배당주(SCHD) 저평가 우위", desc: "현재 QQQ/SCHD 비율 18.8 (높을수록 나스닥 대비 배당가치주 가성비 상승)", pct: 78 },
@@ -225,6 +266,7 @@
       renderMovers();
       renderCategories();
       renderRatios();
+      renderMarket();
     }
 
     function setPeriod(p) {
@@ -392,6 +434,214 @@
         }
       })
       .catch(() => {});
+
+    // ─────────────────────────────────────────────────────────────
+    // 시장 온도계: 김치 프리미엄(BTC) + 크립토 공포·탐욕 지수
+    //   전부 무료·키 불필요 공개 API. 실패 시 저장값 → data.json → 안내문 순서로 폴백.
+    // ─────────────────────────────────────────────────────────────
+    const MARKET_CACHE_KEY = 'sayo_market_v1';
+
+    const UPBIT_BTC = { name: 'Upbit', url: 'https://api.upbit.com/v1/ticker?markets=KRW-BTC', pick: d => parseFloat(d && d[0] && d[0].trade_price) };
+
+    // 해외 BTC/USD 무료 공개 시세 (바이낸스는 지역 차단이 잦아 마지막 순번)
+    const OVERSEAS_BTC = [
+      { name: 'Coinbase', url: 'https://api.coinbase.com/v2/prices/BTC-USD/spot', pick: d => parseFloat(d && d.data && d.data.amount) },
+      { name: 'CoinGecko', url: 'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd', pick: d => parseFloat(d && d.bitcoin && d.bitcoin.usd) },
+      { name: 'Kraken', url: 'https://api.kraken.com/0/public/Ticker?pair=XBTUSD', pick: d => parseFloat(d && d.result && d.result.XXBTZUSD && d.result.XXBTZUSD.c && d.result.XXBTZUSD.c[0]) },
+      { name: 'OKX', url: 'https://www.okx.com/api/v5/market/ticker?instId=BTC-USDT', pick: d => parseFloat(d && d.data && d.data[0] && d.data[0].last) },
+      { name: 'Binance', url: 'https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT', pick: d => parseFloat(d && d.price) }
+    ];
+
+    // 원/달러 환율 무료 공개 소스
+    const FX_SOURCES = [
+      { name: 'open.er-api.com', url: 'https://open.er-api.com/v6/latest/USD', pick: d => parseFloat(d && d.rates && d.rates.KRW) },
+      { name: 'frankfurter.dev', url: 'https://api.frankfurter.dev/v1/latest?base=USD&symbols=KRW', pick: d => parseFloat(d && d.rates && d.rates.KRW) },
+      { name: 'jsdelivr', url: 'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json', pick: d => parseFloat(d && d.usd && d.usd.krw) }
+    ];
+
+    const FNG_URL = 'https://api.alternative.me/fng/?limit=1';
+    let marketState = { kimchi: null, fng: null };
+    let marketRefreshedAt = null;
+    let marketTried = false;
+    let marketTimer = null;
+
+    function jsonWithTimeout(url, ms) {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), ms || 6000);
+      return fetch(url, { signal: ctrl.signal, cache: 'no-store' })
+        .then(res => { if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
+        .finally(() => clearTimeout(timer));
+    }
+
+    async function firstOk(sources) {
+      for (const s of sources) {
+        try {
+          const value = s.pick(await jsonWithTimeout(s.url));
+          if (value && isFinite(value) && value > 0) return { value: value, name: s.name };
+        } catch (e) { /* 다음 무료 소스로 넘어감 */ }
+      }
+      return null;
+    }
+
+    function loadMarketCache() {
+      try {
+        const raw = localStorage.getItem(MARKET_CACHE_KEY);
+        if (!raw) return null;
+        const c = JSON.parse(raw);
+        if (!c || !c.savedAt || Date.now() - c.savedAt > 24 * 3600 * 1000) return null;
+        return c;
+      } catch (e) { return null; }
+    }
+
+    function saveMarketCache() {
+      try {
+        localStorage.setItem(MARKET_CACHE_KEY, JSON.stringify({ kimchi: marketState.kimchi, fng: marketState.fng, savedAt: Date.now() }));
+      } catch (e) { /* 저장 불가 환경(사생활 보호 모드)에서는 그냥 생략 */ }
+    }
+
+    function hhmm(ts) {
+      const d = new Date(ts);
+      return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+    }
+
+    function kimchiTone(p) {
+      if (p >= 2) return { badge: '김프 강함', cls: 'bg-rose-500/20 text-rose-300 border-rose-500/40', text: 'text-rose-400', marker: 'bg-rose-400' };
+      if (p >= 0.2) return { badge: '김프', cls: 'bg-amber-500/20 text-amber-300 border-amber-500/40', text: 'text-amber-400', marker: 'bg-amber-400' };
+      if (p > -2) return { badge: '김프 거의 없음', cls: 'bg-slate-700/50 text-slate-300 border-slate-600', text: 'text-slate-200', marker: 'bg-slate-300' };
+      return { badge: '역프리미엄', cls: 'bg-sky-500/20 text-sky-300 border-sky-500/40', text: 'text-sky-400', marker: 'bg-sky-400' };
+    }
+
+    function fngTone(v) {
+      if (v <= 24) return { label: '극단적 공포', cls: 'bg-rose-500/20 text-rose-300 border-rose-500/40', text: 'text-rose-400' };
+      if (v <= 44) return { label: '공포', cls: 'bg-orange-500/20 text-orange-300 border-orange-500/40', text: 'text-orange-400' };
+      if (v <= 55) return { label: '중립', cls: 'bg-slate-700/50 text-slate-300 border-slate-600', text: 'text-slate-200' };
+      if (v <= 75) return { label: '탐욕', cls: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40', text: 'text-emerald-400' };
+      return { label: '극단적 탐욕', cls: 'bg-emerald-500/25 text-emerald-200 border-emerald-400/60', text: 'text-emerald-300' };
+    }
+
+    function fngComment(v) {
+      if (v <= 24) return '대중이 겁에 질린 바닥권 — 역발상 분할 매수 후보 구간입니다.';
+      if (v <= 44) return '공포가 우세한 구간 — 정해진 날짜의 분할 적립에 유리합니다.';
+      if (v <= 55) return '과열도 공포도 없는 중립 구간입니다.';
+      if (v <= 75) return '탐욕이 우세한 구간 — 추격 매수는 줄이는 편이 좋습니다.';
+      return '과열 극단 구간 — 신규 매수는 미루고 현금 비중을 점검하세요.';
+    }
+
+    function fmtWon(n) { return Math.round(n).toLocaleString('ko-KR') + '원'; }
+    function fmtUsd(n) { return '$' + Number(n).toLocaleString('en-US', { maximumFractionDigits: 0 }); }
+
+    function renderMarket() {
+      const cache = loadMarketCache();
+      const dataMarket = (appData && appData.market) || {};
+      const kimchi = marketState.kimchi
+        || (cache && cache.kimchi)
+        || (dataMarket.kimchi && dataMarket.kimchi.premium != null ? dataMarket.kimchi : null);
+      const fng = marketState.fng
+        || (cache && cache.fng)
+        || (dataMarket.cryptoFng && dataMarket.cryptoFng.value != null ? dataMarket.cryptoFng : null);
+
+      const stampLive = marketRefreshedAt ? '실시간 ' + hhmm(marketRefreshedAt) : '자동 갱신';
+      const stampCache = cache ? '저장값 ' + hhmm(cache.savedAt) : '자동 갱신';
+
+      // --- 김치 프리미엄 ---
+      const kPct = document.getElementById('kimchi-pct');
+      const kBadge = document.getElementById('kimchi-badge');
+      const kMarker = document.getElementById('kimchi-marker');
+      const kDetail = document.getElementById('kimchi-detail');
+      const kLive = document.getElementById('kimchi-live');
+
+      if (kimchi && isFinite(Number(kimchi.premium))) {
+        const p = Number(kimchi.premium);
+        const tone = kimchiTone(p);
+        kPct.textContent = (p > 0 ? '+' : '') + p.toFixed(2) + '%';
+        kPct.className = 'text-3xl font-extrabold leading-none ' + tone.text;
+        kBadge.textContent = tone.badge;
+        kBadge.className = 'text-[11px] font-extrabold px-2 py-0.5 mb-0.5 rounded-full border ' + tone.cls;
+        kMarker.className = 'absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-2.5 h-2.5 rounded-full ring-2 ring-slate-900 transition-all ' + tone.marker;
+        kMarker.style.left = Math.min(98, Math.max(2, ((p + 10) / 20) * 100)) + '%';
+
+        const meaning = p > 0.2
+          ? '같은 비트코인이 국내(업비트)에서 ' + p.toFixed(1) + '% 더 비쌉니다.'
+          : (p < -0.2 ? '국내가가 해외보다 ' + Math.abs(p).toFixed(1) + '% 쌉니다.' : '국내·해외 가격이 사실상 같습니다.');
+        kDetail.innerHTML = '업비트 ' + fmtWon(kimchi.upbitKrw) + ' · 해외 ' + fmtUsd(kimchi.overseasUsd)
+          + (kimchi.usdSource ? ' (' + kimchi.usdSource + ')' : '') + ' · 환율 ' + Number(kimchi.usdKrw).toFixed(2) + '원'
+          + '<br>' + meaning;
+        kLive.textContent = marketState.kimchi ? stampLive : (cache && cache.kimchi ? stampCache : '자동 갱신');
+      } else {
+        kPct.textContent = '—';
+        kPct.className = 'text-3xl font-extrabold leading-none text-slate-400';
+        kBadge.textContent = marketTried ? '집계 불가' : '대조 중';
+        kBadge.className = 'text-[11px] font-extrabold px-2 py-0.5 mb-0.5 rounded-full border border-slate-700 text-slate-400';
+        kDetail.textContent = marketTried
+          ? '시세를 불러오지 못했어요. 잠시 후 새로고침해 주세요.'
+          : '업비트·해외 시세·환율을 대조하는 중입니다.';
+        kLive.textContent = marketTried ? '연결 실패' : '불러오는 중…';
+      }
+
+      // --- 크립토 공포·탐욕 지수 ---
+      const fValue = document.getElementById('fng-value');
+      const fBadge = document.getElementById('fng-badge');
+      const fMarker = document.getElementById('fng-marker');
+      const fDetail = document.getElementById('fng-detail');
+      const fLive = document.getElementById('fng-live');
+
+      if (fng && fng.value != null && isFinite(Number(fng.value))) {
+        const v = Math.min(100, Math.max(0, Math.round(Number(fng.value))));
+        const tone = fngTone(v);
+        fValue.textContent = String(v);
+        fValue.className = 'text-3xl font-extrabold leading-none ' + tone.text;
+        fBadge.textContent = tone.label;
+        fBadge.className = 'text-[11px] font-extrabold px-2 py-0.5 mb-0.5 rounded-full border ml-auto ' + tone.cls;
+        fMarker.style.left = Math.min(99, Math.max(1, v)) + '%';
+        fDetail.textContent = fngComment(v) + ' (alternative.me · BTC 중심)';
+        fLive.textContent = marketState.fng ? stampLive : (cache && cache.fng ? stampCache : '자동 갱신');
+      } else {
+        fValue.textContent = '—';
+        fValue.className = 'text-3xl font-extrabold leading-none text-slate-400';
+        fBadge.textContent = marketTried ? '집계 불가' : '대조 중';
+        fBadge.className = 'text-[11px] font-extrabold px-2 py-0.5 mb-0.5 rounded-full border border-slate-700 text-slate-400 ml-auto';
+        fDetail.textContent = marketTried
+          ? '지수를 불러오지 못했어요. 잠시 후 새로고침해 주세요.'
+          : 'alternative.me의 크립토 심리 지수를 대조하는 중입니다.';
+        fLive.textContent = marketTried ? '연결 실패' : '불러오는 중…';
+      }
+    }
+
+    async function refreshMarket() {
+      const [upbit, overseas, fx, fngRaw] = await Promise.all([
+        firstOk([UPBIT_BTC]),
+        firstOk(OVERSEAS_BTC),
+        firstOk(FX_SOURCES),
+        jsonWithTimeout(FNG_URL).catch(() => null)
+      ]);
+
+      if (upbit && overseas && fx) {
+        const overseasKrw = overseas.value * fx.value;
+        marketState.kimchi = {
+          premium: Math.round(((upbit.value - overseasKrw) / overseasKrw) * 10000) / 100,
+          upbitKrw: Math.round(upbit.value),
+          overseasUsd: Math.round(overseas.value * 100) / 100,
+          usdKrw: Math.round(fx.value * 100) / 100,
+          usdSource: overseas.name,
+          fxSource: fx.name
+        };
+      }
+
+      const row = fngRaw && fngRaw.data && fngRaw.data[0];
+      if (row && row.value != null && isFinite(parseFloat(row.value))) {
+        marketState.fng = { value: parseInt(row.value, 10), label: row.value_classification || '' };
+      }
+
+      marketRefreshedAt = Date.now();
+      marketTried = true;
+      if (marketState.kimchi || marketState.fng) saveMarketCache();
+      renderMarket();
+    }
+
+    // 1분마다 자동 갱신 (탭이 다시 보일 때도 즉시 한 번)
+    refreshMarket();
+    marketTimer = setInterval(() => { if (!document.hidden) refreshMarket(); }, 60000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshMarket(); });
 
     renderAll();
   </script>

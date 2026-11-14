@@ -14,28 +14,45 @@ now_str = datetime.now(KST).strftime("%Y.%m.%d %H:%M 업데이트")
 
 def load_previous_state():
   """이전 data.json이 존재하면 읽어서 직전 F&G 및 종목 데이터를 복구용으로 로드합니다."""
+  empty = {
+      "fng": 50,
+      "fng_label": "Neutral",
+      "items": {},
+      "kimchi": None,
+  }
   if not os.path.exists("data.json"):
-    return {"fng": 50, "items": {}}
+    return empty
   try:
     with open("data.json", "r", encoding="utf-8") as f:
       data = json.load(f)
 
-    prev_fng = 50
-    for r in data.get("ratios", []):
-      if "공포" in r.get("title", ""):
-        m = re.search(r"(\d+)점", r.get("desc", ""))
-        if m:
-          prev_fng = int(m.group(1))
+    prev_market = data.get("market") or {}
+    prev_crypto_fng = prev_market.get("cryptoFng") or {}
+
+    prev_fng = prev_crypto_fng.get("value")
+    prev_fng_label = prev_crypto_fng.get("label") or "Neutral"
+    if not isinstance(prev_fng, (int, float)):
+      prev_fng = 50
+      for r in data.get("ratios", []):
+        if "공포" in r.get("title", ""):
+          m = re.search(r"(\d+)점", r.get("desc", ""))
+          if m:
+            prev_fng = int(m.group(1))
 
     prev_items = {}
     for cat in data.get("categories", []):
       for it in cat.get("items", []):
         prev_items[it["ticker"]] = it
 
-    return {"fng": prev_fng, "items": prev_items}
+    return {
+        "fng": int(prev_fng),
+        "fng_label": prev_fng_label,
+        "items": prev_items,
+        "kimchi": prev_market.get("kimchi"),
+    }
   except Exception as e:
     print(f"Warning: could not read previous data.json: {e}")
-    return {"fng": 50, "items": {}}
+    return empty
 
 
 # 1. trade.xyz / Hyperliquid 무료 펀딩비 가져오기 (키 불필요, 3회 재시도)
@@ -68,7 +85,16 @@ def get_hl_funding(max_retries=3):
 
 
 # 2. 크립토 공포탐욕지수 무료 조회 (키 불필요, 3회 재시도 및 직전값 보존)
-def get_fear_greed(fallback_val=50, max_retries=3):
+FNG_LABELS_KO = {
+    "Extreme Fear": "극단적 공포",
+    "Fear": "공포",
+    "Neutral": "중립",
+    "Greed": "탐욕",
+    "Extreme Greed": "극단적 탐욕",
+}
+
+
+def get_crypto_fear_greed(fallback_val=50, fallback_label="Neutral", max_retries=3):
   url = "https://api.alternative.me/fng/?limit=1"
   headers = {"User-Agent": "Mozilla/5.0"}
 
@@ -77,14 +103,141 @@ def get_fear_greed(fallback_val=50, max_retries=3):
       req = urllib.request.Request(url, headers=headers)
       with urllib.request.urlopen(req, timeout=10) as res:
         data = json.loads(res.read().decode("utf-8"))
-        return int(data["data"][0]["value"])
+        row = data["data"][0]
+        label = row.get("value_classification") or "Neutral"
+        return {
+            "value": int(row["value"]),
+            "label": label,
+            "labelKo": FNG_LABELS_KO.get(label, label),
+        }
     except Exception as e:
       print(f"Fear & Greed fetch attempt {attempt}/{max_retries} failed: {e}")
       if attempt < max_retries:
         time.sleep(1.5 * attempt)
 
   print(f"Warning: Fear & Greed API failed. Falling back to: {fallback_val}")
-  return fallback_val
+  return {
+      "value": int(fallback_val),
+      "label": fallback_label,
+      "labelKo": FNG_LABELS_KO.get(fallback_label, fallback_label),
+  }
+
+
+# 2-1. 무료 공개 API 단건 JSON 호출 helper (키·가입 불필요)
+def _http_json(url, timeout=10):
+  req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+  with urllib.request.urlopen(req, timeout=timeout) as res:
+    return json.loads(res.read().decode("utf-8"))
+
+
+# 2-2. 김치 프리미엄(BTC) : 업비트 KRW 시세 vs 해외 USD 시세 * 원/달러 환율
+# 해외 시세는 무료 공개 API를 순서대로 시도합니다(바이낸스는 지역 차단이 잦아 뒤로 배치).
+OVERSEAS_BTC_SOURCES = [
+    (
+        "Coinbase",
+        "https://api.coinbase.com/v2/prices/BTC-USD/spot",
+        lambda d: float(d["data"]["amount"]),
+    ),
+    (
+        "CoinGecko",
+        "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd",
+        lambda d: float(d["bitcoin"]["usd"]),
+    ),
+    (
+        "Kraken",
+        "https://api.kraken.com/0/public/Ticker?pair=XBTUSD",
+        lambda d: float(d["result"]["XXBTZUSD"]["c"][0]),
+    ),
+    (
+        "OKX",
+        "https://www.okx.com/api/v5/market/ticker?instId=BTC-USDT",
+        lambda d: float(d["data"][0]["last"]),
+    ),
+    (
+        "Binance",
+        "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT",
+        lambda d: float(d["price"]),
+    ),
+]
+
+FX_SOURCES = [
+    (
+        "open.er-api.com",
+        "https://open.er-api.com/v6/latest/USD",
+        lambda d: float(d["rates"]["KRW"]),
+    ),
+    (
+        "frankfurter.dev",
+        "https://api.frankfurter.dev/v1/latest?base=USD&symbols=KRW",
+        lambda d: float(d["rates"]["KRW"]),
+    ),
+    (
+        "jsdelivr/currency-api",
+        "https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json",
+        lambda d: float(d["usd"]["krw"]),
+    ),
+]
+
+
+def get_kimchi_premium(prev=None):
+  """김프(%) = ((업비트 KRW - 해외 USD * 환율) / (해외 USD * 환율)) * 100"""
+  prev = prev or {}
+
+  upbit_krw = None
+  try:
+    upbit_krw = float(
+        _http_json("https://api.upbit.com/v1/ticker?markets=KRW-BTC")[0][
+            "trade_price"
+        ]
+    )
+  except Exception as e:
+    print(f"Warning: Upbit BTC price fetch failed: {e}")
+
+  overseas_usd, usd_source = None, None
+  for name, url, pick in OVERSEAS_BTC_SOURCES:
+    try:
+      price = pick(_http_json(url))
+      if price and price > 0:
+        overseas_usd, usd_source = price, name
+        break
+    except Exception as e:
+      print(f"Warning: overseas BTC price from {name} failed: {e}")
+
+  usd_krw, fx_source = None, None
+  for name, url, pick in FX_SOURCES:
+    try:
+      rate = pick(_http_json(url))
+      if rate and rate > 0:
+        usd_krw, fx_source = rate, name
+        break
+    except Exception as e:
+      print(f"Warning: USD/KRW from {name} failed: {e}")
+
+  # 일부 소스만 실패하면 직전 정상값으로 메꿔서 김프를 계속 계산
+  if upbit_krw is None:
+    upbit_krw = prev.get("upbitKrw")
+  if overseas_usd is None:
+    overseas_usd = prev.get("overseasUsd")
+    usd_source = prev.get("usdSource")
+  if usd_krw is None:
+    usd_krw = prev.get("usdKrw")
+    fx_source = prev.get("fxSource")
+
+  if not (upbit_krw and overseas_usd and usd_krw):
+    print("Warning: kimchi premium unavailable, keeping previous snapshot.")
+    return prev or None
+
+  overseas_krw = float(overseas_usd) * float(usd_krw)
+  premium = round((float(upbit_krw) - overseas_krw) / overseas_krw * 100, 2)
+
+  return {
+      "premium": premium,
+      "upbitKrw": round(float(upbit_krw)),
+      "overseasUsd": round(float(overseas_usd), 2),
+      "usdKrw": round(float(usd_krw), 2),
+      "usdSource": usd_source,
+      "fxSource": fx_source,
+  }
 
 
 # 3. RSI(14) 계산 함수
@@ -227,7 +380,12 @@ def main():
   prev_fng = prev_state.get("fng", 50)
   prev_items = prev_state.get("items", {})
 
-  fng = get_fear_greed(fallback_val=prev_fng)
+  fng_info = get_crypto_fear_greed(
+      fallback_val=prev_fng,
+      fallback_label=prev_state.get("fng_label", "Neutral"),
+  )
+  fng = fng_info["value"]
+  kimchi = get_kimchi_premium(prev_state.get("kimchi"))
   hl_funding = get_hl_funding()
 
   config = [
@@ -360,14 +518,15 @@ def main():
           "pct": min(95, max(20, int(gs_ratio))),
       },
       {
-          "title": "시장 심리 온도계 (공포·탐욕)",
+          "title": "크립토 공포·탐욕 지수 (BTC 심리)",
           "winner": (
               "공포 구간 (매수 유리)"
               if fng < 45
               else ("과열 주의" if fng > 65 else "중립 구간")
           ),
           "desc": (
-              f"현재 글로벌 투자 심리 지수 {fng}점 (낮을수록 대중이 공포에 떤 바닥권)"
+              f"현재 크립토 투자 심리 {fng}점 · {fng_info['labelKo']}"
+              " (alternative.me 기준, 낮을수록 대중이 공포에 떤 바닥권)"
           ),
           "pct": 100 - fng,
       },
@@ -421,7 +580,17 @@ def main():
       },
   ]
 
-  output = {"updatedAt": now_str, "categories": categories, "ratios": ratios}
+  market = {
+      "kimchi": kimchi,
+      "cryptoFng": fng_info,
+  }
+
+  output = {
+      "updatedAt": now_str,
+      "categories": categories,
+      "ratios": ratios,
+      "market": market,
+  }
 
   # 원자적 파일 쓰기 (작성 도중단 방지)
   tmp_file = "data.json.tmp"
@@ -432,6 +601,14 @@ def main():
       f"[{now_str}] Successfully updated data.json with {len(categories)}"
       " categories."
   )
+  if kimchi:
+    print(
+        "Kimchi premium (BTC):"
+        f" {kimchi['premium']}% / upbit {kimchi['upbitKrw']:,} KRW vs"
+        f" {kimchi['overseasUsd']} USD ({kimchi['usdSource']}) *"
+        f" {kimchi['usdKrw']} KRW ({kimchi['fxSource']})"
+    )
+  print(f"Crypto Fear & Greed: {fng} ({fng_info['labelKo']})")
 
 
 if __name__ == "__main__":
