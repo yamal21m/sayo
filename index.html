@@ -25,7 +25,7 @@
         <p class="text-sm font-bold text-sky-400 mt-0.5">"그래서 지금 사요?" <span class="text-xs font-normal text-slate-400">— 6대 자산 바겐세일 신호등</span></p>
       </div>
       <div class="text-right flex flex-col items-end gap-1.5">
-        <span id="update-time" class="text-xs text-slate-400 bg-slate-800 px-2.5 py-1 rounded-full">자동 업데이트 연동됨</span>
+        <span id="update-time" class="text-xs text-slate-400 bg-slate-800 px-2.5 py-1 rounded-full">시세 데이터 불러오는 중…</span>
         <div id="visitor-stats" class="text-[11px] text-slate-400 flex items-center gap-1.5 font-medium pr-1">
           <span>오늘 <strong id="visitor-today" class="text-slate-300 font-semibold">-</strong></span>
           <span class="text-slate-600">·</span>
@@ -42,7 +42,7 @@
       <div class="flex items-center gap-2.5">
         <span class="text-lg">💡</span>
         <p id="top-summary" class="text-sm sm:text-base font-semibold text-slate-100">
-          오늘 가장 싼 자산: <span class="text-emerald-400 font-extrabold">미국 장기채(TLT)</span> · <span class="text-emerald-400 font-extrabold">은(SLV)</span>
+          <span class="text-slate-400 font-semibold">오늘 가장 싼 자산을 계산하는 중입니다…</span>
         </p>
       </div>
       <button onclick="filterGreenOnly()" id="filter-btn" class="text-xs font-bold bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 px-3 py-1.5 rounded-lg transition self-start sm:self-auto">
@@ -277,70 +277,73 @@
     let currentPeriod = '1D';
     let selectedCatId = null;
 
-    // 기본 데이터 (자동 업데이트 파일 data.json이 생성되면 자동으로 덮어씌워짐)
-    let appData = {
-      updatedAt: "실시간 데이터 연동 대기 중",
-      categories: [
-        {
-          id: "bonds", icon: "💵", name: "채권 · 환율",
-          items: [
-            { ticker: "TLT", name: "미국 20년+ 장기채", price: "$91.2", chg1d: -1.8, chg1w: -3.4, score: 84, s1: 31, s2: 26, s3: 17, s4: 10, comment: "200일 평균선 대비 저렴하며 미국 장기 금리 상단 구간에 진입해 바겐세일 매력도가 높습니다." },
-            { ticker: "IEF", name: "미국 7-10년 중기채", price: "$94.5", chg1d: -0.9, chg1w: -1.9, score: 76, s1: 28, s2: 23, s3: 15, s4: 10, comment: "장기채보다 변동성이 낮으면서 금리 매력이 높은 안정적 적립 구간입니다." },
-            { ticker: "JPY/KRW", name: "엔화 환율 (100엔)", price: "905원", chg1d: -0.4, chg1w: -1.2, score: 74, s1: 27, s2: 22, s3: 15, s4: 10, comment: "최근 3년 환율 박스권 하단에 위치해 분할 환전 매력이 높습니다." },
-            { ticker: "SGOV", name: "미국 초단기채(파킹)", price: "$100.1", chg1d: 0.0, chg1w: 0.1, score: 65, s1: 22, s2: 18, s3: 15, s4: 10, comment: "대기 자금을 안전하게 파킹하며 이자를 받기 좋은 구간입니다." },
-            { ticker: "USD/KRW", name: "달러 환율", price: "1,385원", chg1d: 0.3, chg1w: 1.1, score: 45, s1: 15, s2: 12, s3: 10, s4: 8, comment: "역사적 평균 대비 높은 환율 구간으로 공격적 환전보다 관망이 유리합니다." }
-          ]
-        },
-        {
-          id: "metals", icon: "🥈", name: "귀금속 (금·은)",
-          items: [
-            { ticker: "SLV", name: "은 ETF (Silver)", price: "$27.4", chg1d: -2.4, chg1w: -4.1, score: 79, s1: 28, s2: 24, s3: 17, s4: 10, comment: "금 대비 은의 상대 가격이 역사적 저평가 구간(금/은 비율 80 이상)에 머물러 있습니다." },
-            { ticker: "GLD", name: "금 ETF (Gold)", price: "$218.5", chg1d: -0.3, chg1w: 0.8, score: 62, s1: 20, s2: 18, s3: 14, s4: 10, comment: "지정학 리스크 방어용으로 정액 적립을 유지하기 적합한 구간입니다." }
-          ]
-        },
-        {
-          id: "reits", icon: "🏢", name: "부동산 리츠",
-          items: [
-            { ticker: "O", name: "리얼티 인컴 (월배당)", price: "$53.8", chg1d: -1.1, chg1w: -2.5, score: 73, s1: 26, s2: 21, s3: 16, s4: 10, comment: "주가 조정으로 월배당 수익률이 5.7%대로 올라와 배당 적립 매력이 켜졌습니다." },
-            { ticker: "VNQ", name: "미국 부동산 리츠", price: "$84.2", chg1d: -0.8, chg1w: -1.6, score: 64, s1: 22, s2: 19, s3: 14, s4: 9, comment: "금리 인하 사이클을 기다리며 평소대로 모아가는 중립 구간입니다." },
-            { ticker: "476800.KS", name: "한국 리츠 인프라", price: "4,620원", chg1d: -0.2, chg1w: -0.6, score: 68, s1: 24, s2: 20, s3: 15, s4: 9, comment: "안정적인 배당 흐름을 바탕으로 분할 적립하기 무난한 위치입니다." }
-          ]
-        },
-        {
-          id: "commodities", icon: "🛢️", name: "원자재 (유가·구리)",
-          items: [
-            { ticker: "USO", name: "WTI 원유 ETF", price: "$71.4", chg1d: -1.9, chg1w: -3.2, score: 67, s1: 24, s2: 20, s3: 14, s4: 9, comment: "최근 가격 박스권 중하단에 진입하여 인플레이션 헤지용 분할 접근이 가능합니다." },
-            { ticker: "CPER", name: "구리 ETF (닥터코퍼)", price: "$26.1", chg1d: -0.7, chg1w: -1.4, score: 58, s1: 20, s2: 17, s3: 12, s4: 9, comment: "실물 경기 흐름에 맞춰 정액 적립을 유지하는 중립 구간입니다." }
-          ]
-        },
-        {
-          id: "stocks", icon: "📈", name: "주식 (미·한)",
-          items: [
-            { ticker: "SCHD", name: "미국 배당다우존스", price: "$28.1", chg1d: -0.4, chg1w: -0.9, score: 71, s1: 25, s2: 20, s3: 16, s4: 10, comment: "기술주 변동성 장세 속에서도 배당 매력과 가치주 방어력이 돋보이는 초록불 구간입니다." },
-            { ticker: "SOXX", name: "미국 반도체 ETF", price: "$215.0", chg1d: -2.9, chg1w: -5.4, score: 64, s1: 22, s2: 21, s3: 12, s4: 9, comment: "단기 급락으로 과매도권에 근접했으나 변동성을 고려해 분할로 접근하세요." },
-            { ticker: "KOSPI", name: "한국 코스피 지수", price: "2,580", chg1d: -0.8, chg1w: -2.1, score: 63, s1: 23, s2: 19, s3: 13, s4: 8, comment: "역사적 PBR 하단 부근으로 저평가 영역이나 환율 안정 여부를 함께 체크하세요." },
-            { ticker: "SPY", name: "미국 S&P 500", price: "$578.0", chg1d: -0.5, chg1w: 0.4, score: 46, s1: 15, s2: 13, s3: 10, s4: 8, comment: "장기 평균선 위에 위치해 있어 무리한 추격보다 정해진 적립식만 유지하세요." },
-            { ticker: "QQQ", name: "미국 나스닥 100", price: "$492.0", chg1d: 1.8, chg1w: 3.1, score: 34, s1: 10, s2: 9, s3: 8, s4: 7, comment: "단기 과열 구간입니다. 추격 매수는 참아 보고 초록불 자산을 먼저 점검하세요." }
-          ]
-        },
-        {
-          id: "crypto", icon: "🪙", name: "크립토 (코인)",
-          items: [
-            { ticker: "ETH", name: "이더리움 (Ethereum)", price: "$2,540", chg1d: -1.5, chg1w: -3.8, score: 66, s1: 24, s2: 20, s3: 13, s4: 9, comment: "비트코인 대비 상대적 소외도가 높아 분할 적립 가성비가 양호합니다." },
-            { ticker: "BTC", name: "비트코인 (Bitcoin)", price: "$68,200", chg1d: 2.2, chg1w: 4.5, score: 42, s1: 14, s2: 12, s3: 9, s4: 7, comment: "장기 추세선 상단 부근으로 정해진 적립식 외 과도한 추격 매수는 자제할 구간입니다." },
-            { ticker: "SOL", name: "솔라나 (Solana)", price: "$174.0", chg1d: 3.5, chg1w: 6.8, score: 31, s1: 9, s2: 8, s3: 8, s4: 6, comment: "단기 급등과 선물 롱 펀딩비 과열이 겹쳐 있습니다. 눌림목을 기다리세요." }
-          ]
-        }
-      ],
-      ratios: [
-        { title: "금 vs 은 (ETF 상대 비율)", winner: "은(SLV) 저평가 우위", desc: "현재 GLD/SLV 환산비율 79.4 (높을수록 은이 상대적으로 저렴)", pct: 79 },
-        { title: "크립토 공포·탐욕 지수 (BTC 심리)", winner: "공포 구간 (매수 유리)", desc: "현재 크립토 투자 심리 13점 · 극단적 공포 (alternative.me 기준, 낮을수록 대중이 공포에 떤 바닥권)", pct: 87 },
-        { title: "이더 vs 비트 (ETH / BTC 비율)", winner: "이더리움(ETH) 저평가 우위", desc: "현재 ETH/BTC 비율 0.0278 (0.040 이하 시 이더·알트 가성비 바닥 매력)", pct: 82 },
-        { title: "장기채 vs 단기채 (TLT / SGOV)", winner: "장기채(TLT) 반등 차익 우위", desc: "현재 TLT/SGOV 비율 0.80 (낮을수록 장기 금리 상단·차익 메리트)", pct: 85 },
-        { title: "성장주 vs 배당주 (QQQ / SCHD)", winner: "배당주(SCHD) 저평가 우위", desc: "현재 QQQ/SCHD 비율 18.8 (높을수록 나스닥 대비 배당가치주 가성비 상승)", pct: 78 },
-        { title: "구리 vs 금 (CPER / GLD 경기 선행)", winner: "구리(CPER) 반등 가성비 우위", desc: "현재 CPER/GLD 환산비율 1.02 (낮을수록 실물 경기 회복 시 구리 잠재력 우위)", pct: 82 }
-      ]
-    };
+    // data.json 을 받기 전에는 임시 샘플 수치를 절대 그리지 않습니다.
+    //   (예전엔 하드코딩된 옛날 시세가 실제 시세처럼 2~3초 노출됐음)
+    //   카테고리 이름만 미리 잡아 두고 값은 불러온 뒤에 채웁니다.
+    let appData = null;
+    let dataState = 'loading'; // loading | ready | error
+
+    const CATEGORY_SHELL = [
+      { id: 'bonds', icon: '💵', name: '채권 · 환율' },
+      { id: 'metals', icon: '🥈', name: '귀금속 (금·은)' },
+      { id: 'reits', icon: '🏢', name: '부동산 리츠' },
+      { id: 'commodities', icon: '🛢️', name: '원자재 (유가·구리)' },
+      { id: 'stocks', icon: '📈', name: '주식 (미·한)' },
+      { id: 'crypto', icon: '🪙', name: '크립토 (코인)' }
+    ];
+
+    function setText(id, text) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = text;
+    }
+
+    // 로딩 중 스켈레톤 (실제 시세처럼 보이는 숫자는 하나도 없음)
+    function renderLoading() {
+      dataState = 'loading';
+      setText('update-time', '시세 데이터 불러오는 중…');
+      const top = document.getElementById('top-summary');
+      if (top) top.innerHTML = '<span class="text-slate-400 font-semibold">오늘 가장 싼 자산을 계산하는 중입니다…</span>';
+      const pills = document.getElementById('mover-pills');
+      if (pills) pills.innerHTML = '<span class="text-slate-500 font-semibold">가격 데이터를 불러오는 중…</span>';
+      const grid = document.getElementById('category-grid');
+      if (grid) {
+        grid.innerHTML = CATEGORY_SHELL.map(c => `
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 text-left flex flex-col justify-between h-32 animate-pulse">
+            <div class="text-sm font-bold text-slate-300">${c.icon} ${c.name}</div>
+            <div class="h-7 w-16 bg-slate-800 rounded my-1"></div>
+            <div class="h-6 w-24 bg-slate-800 rounded-full"></div>
+          </div>`).join('');
+      }
+      const ratios = document.getElementById('ratios-list');
+      if (ratios) {
+        ratios.innerHTML = Array.from({ length: 6 }).map(() => `
+          <div class="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3 animate-pulse">
+            <div class="h-3 w-2/3 bg-slate-800 rounded mb-2"></div>
+            <div class="h-2 w-full bg-slate-800 rounded-full"></div>
+          </div>`).join('');
+      }
+    }
+
+    // data.json 을 끝내 받지 못했을 때: 가짜 수치 대신 분명한 실패 안내
+    function renderLoadError() {
+      dataState = 'error';
+      setText('update-time', '데이터 불러오기 실패');
+      const top = document.getElementById('top-summary');
+      if (top) top.innerHTML = '<span class="text-rose-300 font-bold">시세 데이터를 불러오지 못했습니다.</span> <span class="text-slate-400">잠시 후 새로고침해 주세요.</span>';
+      const pills = document.getElementById('mover-pills');
+      if (pills) pills.innerHTML = '<button onclick="location.reload()" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 px-3 py-1 rounded-full font-bold transition">🔄 다시 불러오기</button>';
+      const grid = document.getElementById('category-grid');
+      if (grid) {
+        grid.innerHTML = `
+          <div class="col-span-2 sm:col-span-3 bg-slate-900 border border-rose-500/40 rounded-2xl p-6 text-center">
+            <div class="text-sm font-bold text-rose-300 mb-1">시세 데이터( data.json )를 받지 못했습니다</div>
+            <p class="text-xs text-slate-400">자동 갱신은 하루 3번(07·16·23시 KST) 돌고 있습니다. 잠시 뒤 다시 열어 주세요.</p>
+            <button onclick="location.reload()" class="mt-3 text-xs font-bold bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 px-3 py-1.5 rounded-lg">다시 불러오기</button>
+          </div>`;
+      }
+      const ratios = document.getElementById('ratios-list');
+      if (ratios) ratios.innerHTML = '<p class="text-xs text-slate-500">데이터를 받지 못해 표시할 수 없습니다.</p>';
+    }
 
     function getSignalInfo(score) {
       if (score >= 70) return { label: "🟢 지금 사요!", cls: "bg-emerald-500/20 text-emerald-300 border-emerald-500/40", textCls: "text-emerald-400" };
@@ -357,6 +360,7 @@
     }
 
     function renderAll() {
+      if (!appData || !Array.isArray(appData.categories) || !appData.categories.length) return;
       document.getElementById('update-time').textContent = appData.updatedAt;
 
       // 최상단 TOP 2 저평가 자산 자동 추출
@@ -516,11 +520,26 @@
       document.getElementById('score-modal').classList.add('hidden');
     }
 
-    // 외부 자동 업데이트 파일(data.json)이 있으면 자동으로 불러오기
-    fetch('./data.json?t=' + Date.now())
-      .then(res => res.ok ? res.json() : null)
-      .then(json => { if (json && json.categories) { appData = json; renderAll(); } })
-      .catch(() => {});
+    // 외부 자동 업데이트 파일(data.json)을 받은 뒤에만 화면을 그립니다.
+    //   받기 전에는 스켈레톤만 보여 주고, 숫자는 절대 지어내지 않습니다.
+    function loadData() {
+      return fetch('./data.json?t=' + Date.now(), { cache: 'no-store' })
+        .then(res => res.ok ? res.json() : null)
+        .then(json => {
+          if (json && Array.isArray(json.categories) && json.categories.length) {
+            appData = json;
+            dataState = 'ready';
+            renderAll();
+            return true;
+          }
+          renderLoadError();
+          return false;
+        })
+        .catch(() => {
+          renderLoadError();
+          return false;
+        });
+    }
 
     // 방문자 수 카운터 (오늘 / 누적)
     const siteUrl = window.location.origin && window.location.origin.startsWith('http')
@@ -903,7 +922,9 @@
     marketTimer = setInterval(() => { if (!document.hidden) refreshMarket(); }, 60000);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshMarket(); });
 
-    renderAll();
+    // 첫 화면은 로딩 스켈레톤 → data.json 도착 후 실제 수치로 교체
+    renderLoading();
+    loadData();
   </script>
 </body>
 </html>

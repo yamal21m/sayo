@@ -400,14 +400,49 @@ def _level_label(value, levels):
   return levels[-1][1]
 
 
+def _last_close(hist):
+  """실제 종가가 있는 마지막 거래일만 남긴 시계열을 돌려줍니다.
+
+  야후 응답의 마지막 행은 아직 종가가 비어 있는 경우(NaN)가 있어, 그대로
+  hist.index[-1] 을 쓰면 날짜와 값이 어긋납니다. 종가가 있는 행만 남겨
+  날짜와 값을 같은 기준으로 맞춥니다.
+  """
+  closes = hist["Close"].dropna()
+  if closes.empty:
+    raise ValueError("no close price in history")
+  return closes
+
+
+def _asof_regressed(new_asof, prev):
+  """새 응답 날짜가 직전 스냅샷 날짜보다 과거면 True(역행 응답 방어).
+
+  야후가 캐시·지연 응답으로 이미 반영된 날짜보다 과거 시세를 돌려주면
+  최신 스냅샷을 과거 값으로 덮어쓰지 않기 위해 사용합니다.
+  """
+  if not new_asof or not isinstance(prev, dict):
+    return False
+  prev_asof = prev.get("asof")
+  if not prev_asof:
+    return False
+  return str(new_asof) < str(prev_asof)
+
+
 def get_index_snapshot(yf_ticker, prev=None, max_retries=2):
   """지수 최근 종가·전일 대비·주간 대비를 가져옵니다(실패 시 직전값 유지)."""
   for attempt in range(1, max_retries + 1):
     try:
       hist = yf.Ticker(yf_ticker).history(period="2mo")
-      closes = hist["Close"].dropna().tolist()
+      closes_series = _last_close(hist)
+      closes = closes_series.tolist()
       if len(closes) < 2:
         raise ValueError("history too short")
+      asof = str(closes_series.index[-1].date())
+      if _asof_regressed(asof, prev):
+        print(
+            f"Warning: {yf_ticker} 응답 날짜 {asof} 가 직전"
+            f" {prev.get('asof')} 보다 과거라 갱신을 건너뜁니다."
+        )
+        return prev
       curr = float(closes[-1])
       prev_1d = float(closes[-2])
       prev_1w = float(closes[-6]) if len(closes) >= 6 else float(closes[0])
@@ -415,7 +450,7 @@ def get_index_snapshot(yf_ticker, prev=None, max_retries=2):
           "value": round(curr, 2),
           "chg1d": round((curr - prev_1d) / prev_1d * 100, 2),
           "chg1w": round((curr - prev_1w) / prev_1w * 100, 2),
-          "asof": str(hist.index[-1].date()),
+          "asof": asof,
       }
     except Exception as e:
       print(
@@ -427,7 +462,7 @@ def get_index_snapshot(yf_ticker, prev=None, max_retries=2):
   return prev
 
 
-def get_kospi_realized_vol(prev=None, max_retries=2):
+def get_kospi_realized_vol(prev=None, min_asof=None, max_retries=2):
   """국장 변동성: 코스피 일간 종가 20거래일 실현변동성(연율 %).
 
   VKOSPI(코스피200 변동성지수)는 무료 공개 API가 없어, 같은 의미의
@@ -436,9 +471,19 @@ def get_kospi_realized_vol(prev=None, max_retries=2):
   for attempt in range(1, max_retries + 1):
     try:
       hist = yf.Ticker("^KS11").history(period="3mo")
-      closes = [float(c) for c in hist["Close"].dropna().tolist()]
+      closes_series = _last_close(hist)
+      closes = [float(c) for c in closes_series.tolist()]
       if len(closes) < 22:
         raise ValueError("history too short")
+      asof = str(closes_series.index[-1].date())
+      # 역행 가드: 이미 반영된 날짜보다 과거 응답이면 최신 스냅샷을 유지합니다.
+      floor_asof = min_asof or (prev or {}).get("asof")
+      if _asof_regressed(asof, {"asof": floor_asof}):
+        print(
+            f"Warning: ^KS11 응답 날짜 {asof} 가 직전 코스피 스냅샷"
+            f" {floor_asof} 보다 과거라 갱신을 건너뜁니다."
+        )
+        return prev
       rets = [
           math.log(closes[i] / closes[i - 1]) for i in range(1, len(closes))
       ][-20:]
@@ -449,7 +494,7 @@ def get_kospi_realized_vol(prev=None, max_retries=2):
           "value": round(vol, 2),
           "chg1d": round((closes[-1] - closes[-2]) / closes[-2] * 100, 2),
           "kospi": round(closes[-1], 2),
-          "asof": str(hist.index[-1].date()),
+          "asof": asof,
       }
     except Exception as e:
       print(
@@ -485,6 +530,7 @@ def analyze_ticker(
     fng,
     hl_funding,
     prev_item=None,
+    min_asof=None,
     max_retries=2,
 ):
   for attempt in range(1, max_retries + 1):
@@ -493,7 +539,16 @@ def analyze_ticker(
       if hist.empty or len(hist) < 30:
         raise ValueError("Data insufficient or empty history")
 
-      closes = hist["Close"].dropna().tolist()
+      closes_series = _last_close(hist)
+      closes = closes_series.tolist()
+      asof = str(closes_series.index[-1].date())
+      # 역행 가드: 이미 반영된 날짜보다 과거 응답이면 직전 정상값을 유지합니다.
+      if _asof_regressed(asof, {"asof": min_asof}):
+        print(
+            f"Warning: {display_ticker} 응답 날짜 {asof} 가 직전"
+            f" {min_asof} 보다 과거라 갱신을 건너뜁니다."
+        )
+        return dict(prev_item) if prev_item else None
       curr = closes[-1]
       prev_1d = closes[-2] if len(closes) >= 2 else curr
       prev_1w = closes[-6] if len(closes) >= 6 else closes[0]
@@ -560,7 +615,7 @@ def analyze_ticker(
       else:
         comment = (
             "단기 급등으로 장기 평균선 대비"
-            f" +{ma_diff_pct:.1f}% 높은 과열 구간입니다. 추격 매수는 참아 보고"
+            f" {ma_diff_pct:+.1f}% 위치한 과열 구간입니다. 추격 매수는 참아 보고"
             " 눌림목을 기다리세요."
         )
 
@@ -576,6 +631,7 @@ def analyze_ticker(
           "s3": s3,
           "s4": s4,
           "comment": comment,
+          "asof": asof,
           "raw_price": curr,
       }
     except Exception as e:
@@ -599,6 +655,10 @@ def main():
   prev_state = load_previous_state()
   prev_fng = prev_state.get("fng", 50)
   prev_items = prev_state.get("items", {})
+  # 이미 반영된 코스피 종가 날짜(역행 응답 가드용)
+  prev_kospi_asof = (prev_items.get("KOSPI") or {}).get("asof") or (
+      prev_state.get("kospiVol") or {}
+  ).get("asof")
 
   fng_info = get_crypto_fear_greed(
       fallback_val=prev_fng,
@@ -619,7 +679,9 @@ def main():
   if move and "value" in move:
     move["labelKo"] = _level_label(move["value"], MOVE_LEVELS)
 
-  kospi_vol = get_kospi_realized_vol(prev_state.get("kospiVol"))
+  kospi_vol = get_kospi_realized_vol(
+      prev_state.get("kospiVol"), min_asof=prev_kospi_asof
+  )
   if kospi_vol and "value" in kospi_vol:
     kospi_vol["labelKo"] = _level_label(kospi_vol["value"], KOSPI_VOL_LEVELS)
 
@@ -704,6 +766,7 @@ def main():
           fng,
           hl_funding,
           prev_item=p_item,
+          min_asof=prev_kospi_asof if yf_t == "^KS11" else None,
           max_retries=2,
       )
       if res:
@@ -865,6 +928,16 @@ def main():
         "KOSPI 20d realized vol:"
         f" {kospi_vol['value']}% ({kospi_vol.get('labelKo')}) as of"
         f" {kospi_vol.get('asof')}"
+    )
+  kospi_item = next(
+      (it for cat in categories for it in cat["items"]
+       if it["ticker"] == "KOSPI"),
+      None,
+  )
+  if kospi_item:
+    print(
+        f"KOSPI: {kospi_item['price']} ({kospi_item['score']}점) as of"
+        f" {kospi_item.get('asof')}"
     )
 
 
