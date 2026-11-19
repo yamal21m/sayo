@@ -541,23 +541,61 @@
         });
     }
 
-    // 방문자 수 카운터 (오늘 / 누적)
-    const siteUrl = window.location.origin && window.location.origin.startsWith('http')
-      ? window.location.origin + window.location.pathname
-      : 'https://sayo-umber.vercel.app';
-    fetch('https://counter.itjustbong.workers.dev/visit?url=' + encodeURIComponent(siteUrl))
-      .then(res => res.ok ? res.json() : null)
-      .then(data => {
-        if (data && data.today !== undefined && data.total !== undefined) {
-          const elToday = document.getElementById('visitor-today');
-          const elTotal = document.getElementById('visitor-total');
-          if (elToday && elTotal) {
-            elToday.textContent = Number(data.today).toLocaleString();
-            elTotal.textContent = Number(data.total).toLocaleString();
-          }
-        }
-      })
-      .catch(() => {});
+    // 방문자 수 카운터 (오늘 / 누적) — countapi.mileshilliard.com (무료·무가입·CORS)
+    //  같은 기기(브라우저)에서 하루에 한 번만 +1 되도록 localStorage에 KST 날짜를 기록한다.
+    const VISIT_API = 'https://countapi.mileshilliard.com/api/v1';
+    const VISIT_KEY_TOTAL = 'sayo_umber_yamal21m_total';
+    const VISIT_KEY_DAY_PREFIX = 'sayo_umber_yamal21m_d_';
+    const VISIT_STAMP_KEY = 'sayo_visitor_date_v1';
+
+    // KST(Asia/Seoul, UTC+9) 기준 오늘 날짜 YYYYMMDD
+    function kstTodayString() {
+      const kst = new Date(Date.now() + 9 * 60 * 60 * 1000);
+      const y = kst.getUTCFullYear();
+      const m = String(kst.getUTCMonth() + 1).padStart(2, '0');
+      const d = String(kst.getUTCDate()).padStart(2, '0');
+      return String(y) + m + d;
+    }
+
+    // mode: 'hit' 이면 +1, 'get' 이면 읽기만. 키가 없으면 404 → 0, 통신 실패 → null
+    async function visitCount(mode, key) {
+      try {
+        const res = await fetch(VISIT_API + '/' + mode + '/' + key + '?t=' + Date.now(), { cache: 'no-store' });
+        if (!res.ok) return mode === 'get' && res.status === 404 ? 0 : null;
+        const data = await res.json();
+        const num = Number(data && data.value);
+        return Number.isFinite(num) ? num : null;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    async function updateVisitorCounter() {
+      const elToday = document.getElementById('visitor-today');
+      const elTotal = document.getElementById('visitor-total');
+      if (!elToday || !elTotal) return;
+
+      const todayKst = kstTodayString();
+      let seenDate = null;
+      try { seenDate = localStorage.getItem(VISIT_STAMP_KEY); } catch (e) {}
+      const isFirstVisitToday = seenDate !== todayKst;
+      const mode = isFirstVisitToday ? 'hit' : 'get';
+
+      const [total, today] = await Promise.all([
+        visitCount(mode, VISIT_KEY_TOTAL),
+        visitCount(mode, VISIT_KEY_DAY_PREFIX + todayKst)
+      ]);
+
+      // 오늘 첫 방문에서 +1에 성공했을 때만 날짜 도장을 찍는다 (실패하면 다음 새로고침에 재시도)
+      if (isFirstVisitToday && total !== null && today !== null) {
+        try { localStorage.setItem(VISIT_STAMP_KEY, todayKst); } catch (e) {}
+      }
+
+      if (total !== null) elTotal.textContent = total.toLocaleString();
+      if (today !== null) elToday.textContent = today.toLocaleString();
+    }
+
+    updateVisitorCounter();
 
     // ─────────────────────────────────────────────────────────────
     // 시장 온도계: 김치 프리미엄(BTC) + 크립토 공포·탐욕 지수
