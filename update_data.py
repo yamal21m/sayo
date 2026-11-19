@@ -19,6 +19,7 @@ def load_previous_state():
       "fng": 50,
       "fng_label": "Neutral",
       "items": {},
+      "ratios": {},
       "kimchi": None,
       "usFng": None,
       "vix": None,
@@ -49,10 +50,17 @@ def load_previous_state():
       for it in cat.get("items", []):
         prev_items[it["ticker"]] = it
 
+    # 상대 가성비 비교는 시세가 없을 때 직전 값을 그대로 유지합니다.
+    prev_ratios = {}
+    for r in data.get("ratios", []):
+      if isinstance(r, dict) and r.get("title"):
+        prev_ratios[r["title"]] = r
+
     return {
         "fng": int(prev_fng),
         "fng_label": prev_fng_label,
         "items": prev_items,
+        "ratios": prev_ratios,
         "kimchi": prev_market.get("kimchi"),
         "usFng": prev_market.get("usFng"),
         "vix": prev_market.get("vix"),
@@ -633,6 +641,8 @@ def analyze_ticker(
           "comment": comment,
           "asof": asof,
           "raw_price": curr,
+          # 1년 고점 대비 할인율: '국장 vs 미장' 상대 비교에 씁니다(저장 전 제거).
+          "raw_mdd": round(mdd_pct, 2),
       }
     except Exception as e:
       print(f"Error on {display_ticker} (attempt {attempt}/{max_retries}): {e}")
@@ -752,6 +762,7 @@ def main():
 
   categories = []
   raw_map = {}
+  mdd_map = {}
 
   for cid, icon, cname, tickers in config:
     items = []
@@ -771,112 +782,187 @@ def main():
       )
       if res:
         raw_price = res.pop("raw_price", None)
+        raw_mdd = res.pop("raw_mdd", None)
         if raw_price is not None:
           raw_map[disp_t] = raw_price
+        if raw_mdd is not None:
+          mdd_map[disp_t] = raw_mdd
         items.append(res)
     if items:
       categories.append(
           {"id": cid, "icon": icon, "name": cname, "items": items}
       )
 
-  # 상대 가성비 자동 계산 (6대 핵심 가성비 지표)
-  # 1. 금 vs 은
-  gld_p = raw_map.get("GLD", 360)
-  slv_p = raw_map.get("SLV", 45)
-  gs_ratio = round((gld_p * 10) / slv_p, 1) if slv_p else 80.0
 
-  # 2. 이더 vs 비트
-  eth_p = raw_map.get("ETH", 2000)
-  btc_p = raw_map.get("BTC", 70000)
-  eth_btc_ratio = round(eth_p / btc_p, 4) if btc_p else 0.030
+  # ─────────────────────────────────────────────────────────────
+  # 상대 가성비 6종 — 모두 'A vs B' 양방향 비교
+  #   각 항목: left / right / winnerSide / winner / pct(우위 강도 50~95) / title / desc
+  #   · pct 50 = 거의 균형, 95 = 한쪽이 확실히 눌림 (막대가 그만큼 쏠립니다)
+  #   · 실제 수집 시세만 사용합니다. 비교에 필요한 값이 없으면 지어내지 않고
+  #     직전 data.json 의 같은 카드를 그대로 유지합니다.
+  # ─────────────────────────────────────────────────────────────
+  prev_ratios = prev_state.get("ratios", {})
+  ratios = []
 
-  # 3. 장기채 vs 단기채
-  tlt_p = raw_map.get("TLT", 80)
-  sgov_p = raw_map.get("SGOV", 100)
-  tlt_sgov_ratio = round(tlt_p / sgov_p, 2) if sgov_p else 0.80
+  def _dominance(value, pivot, span):
+    """기준(pivot)에서 벗어난 정도를 50~95% 우위 강도로 환산합니다."""
+    if not span:
+      return 50
+    ratio = min(1.0, abs(value - pivot) / span)
+    return int(round(50 + 45 * ratio))
 
-  # 4. 성장주 vs 배당주
-  qqq_p = raw_map.get("QQQ", 600)
-  schd_p = raw_map.get("SCHD", 35)
-  qs_ratio = round(qqq_p / schd_p, 1) if schd_p else 18.0
+  def _ratio(title, left, right, left_wins, pct, desc):
+    pct = max(50, min(95, int(pct)))
+    side = "left" if left_wins else "right"
+    winner = (
+        f"{left if left_wins else right} {pct}% 우세"
+        if pct >= 55
+        else "거의 균형"
+    )
+    return {
+        "title": title,
+        "left": left,
+        "right": right,
+        "winnerSide": side,
+        "winner": winner,
+        "pct": pct,
+        "desc": desc,
+    }
 
-  # 5. 구리 vs 금
-  cper_p = raw_map.get("CPER", 37)
-  cg_ratio = round((cper_p * 10) / gld_p, 2) if gld_p else 1.0
+  def _add_ratio(title, payload):
+    if payload is not None:
+      ratios.append(payload)
+      return
+    prev_r = prev_ratios.get(title)
+    if prev_r:
+      print(f"Warning: {title} 비교 시세가 없어 직전 값을 유지합니다.")
+      ratios.append(prev_r)
+    else:
+      print(f"Warning: {title} 비교 시세가 없어 이번 갱신에서는 제외합니다.")
 
-  ratios = [
-      {
-          "title": "금 vs 은 (ETF 상대 비율)",
-          "winner": (
-              "은(SLV) 저평가 우위" if gs_ratio >= 75 else "금·은 균형 구간"
-          ),
-          "desc": (
-              f"현재 GLD/SLV 환산비율 {gs_ratio} (높을수록 은이 상대적으로 저렴)"
-          ),
-          "pct": min(95, max(20, int(gs_ratio))),
-      },
-      {
-          "title": "크립토 공포·탐욕 지수 (BTC 심리)",
-          "winner": (
-              "공포 구간 (매수 유리)"
-              if fng < 45
-              else ("과열 주의" if fng > 65 else "중립 구간")
-          ),
-          "desc": (
-              f"현재 크립토 투자 심리 {fng}점 · {fng_info['labelKo']}"
-              " (alternative.me 기준, 낮을수록 대중이 공포에 떤 바닥권)"
-          ),
-          "pct": 100 - fng,
-      },
-      {
-          "title": "이더 vs 비트 (ETH / BTC 비율)",
-          "winner": (
-              "이더리움(ETH) 저평가 우위"
-              if eth_btc_ratio <= 0.040
-              else ("비트코인(BTC) 우세 구간" if eth_btc_ratio >= 0.060 else "이더·비트 균형 구간")
-          ),
-          "desc": (
-              f"현재 ETH/BTC 비율 {eth_btc_ratio:.4f} (0.040 이하 시 이더·알트 가성비 바닥 매력)"
-          ),
-          "pct": min(95, max(20, int((0.065 - eth_btc_ratio) / 0.045 * 100))),
-      },
-      {
-          "title": "장기채 vs 단기채 (TLT / SGOV)",
-          "winner": (
-              "장기채(TLT) 반등 차익 우위"
-              if tlt_sgov_ratio <= 0.90
-              else "단기채(SGOV) 파킹 우위"
-          ),
-          "desc": (
-              f"현재 TLT/SGOV 비율 {tlt_sgov_ratio:.2f} (낮을수록 장기 금리 상단·차익 메리트)"
-          ),
-          "pct": min(95, max(20, int((1.10 - tlt_sgov_ratio) / 0.35 * 100))),
-      },
-      {
-          "title": "성장주 vs 배당주 (QQQ / SCHD)",
-          "winner": (
-              "배당주(SCHD) 저평가 우위"
-              if qs_ratio >= 16.0
-              else ("성장주(QQQ) 밸류 우위" if qs_ratio <= 12.0 else "성장·가치 균형 구간")
-          ),
-          "desc": (
-              f"현재 QQQ/SCHD 비율 {qs_ratio:.1f} (높을수록 나스닥 대비 배당가치주 가성비 상승)"
-          ),
-          "pct": min(95, max(20, int((qs_ratio - 11.0) / 10.0 * 100))),
-      },
-      {
-          "title": "구리 vs 금 (CPER / GLD 경기 선행)",
-          "winner": (
-              "구리(CPER) 반등 가성비 우위"
-              if cg_ratio <= 1.15
-              else "금(GLD) 안전자산 우위"
-          ),
-          "desc": (
-              f"현재 CPER/GLD 환산비율 {cg_ratio:.2f} (낮을수록 실물 경기 회복 시 구리 잠재력 우위)"
-          ),
-          "pct": min(95, max(20, int((1.60 - cg_ratio) / 0.70 * 100))),
-      },
-  ]
+  # 1) 금 vs 은 — 금 1온스에 은 몇 온스인지(금/은 비율). 높을수록 은이 눌림.
+  payload = None
+  gld_p, slv_p = raw_map.get("GLD"), raw_map.get("SLV")
+  if gld_p and slv_p:
+    gs_ratio = round((gld_p * 10) / slv_p, 1)
+    silver_cheap = gs_ratio >= 70.0
+    payload = _ratio(
+        "금 vs 은",
+        "금",
+        "은",
+        not silver_cheap,
+        _dominance(gs_ratio, 70.0, 20.0),
+        (
+            f"은 쪽이 금보다 상대적으로 많이 눌려 있어요 (금/은 {gs_ratio}배)"
+            if silver_cheap
+            else f"금 쪽이 은보다 상대적으로 많이 눌려 있어요 (금/은 {gs_ratio}배)"
+        ),
+    )
+  _add_ratio("금 vs 은", payload)
+
+  # 2) 국장 vs 미장 — 코스피와 나스닥(QQQ)의 1년 고점 대비 할인율(실현 낙폭) 비교.
+  #    지수 레벨은 서로 비교할 수 없어, '고점에서 얼마나 눌렸는지'를 기준으로 봅니다.
+  payload = None
+  kospi_mdd, qqq_mdd = mdd_map.get("KOSPI"), mdd_map.get("QQQ")
+  if kospi_mdd is not None and qqq_mdd is not None:
+    kospi_cheap = kospi_mdd >= qqq_mdd
+    payload = _ratio(
+        "국장 vs 미장",
+        "코스피",
+        "나스닥",
+        kospi_cheap,
+        _dominance(kospi_mdd - qqq_mdd, 0.0, 15.0),
+        (
+            f"코스피 쪽이 더 눌려 있어요 (1년 고점 대비 -{kospi_mdd:.1f}%"
+            f" vs 나스닥 -{qqq_mdd:.1f}%)"
+            if kospi_cheap
+            else f"나스닥 쪽이 더 눌려 있어요 (1년 고점 대비 -{qqq_mdd:.1f}%"
+            f" vs 코스피 -{kospi_mdd:.1f}%)"
+        ),
+    )
+  _add_ratio("국장 vs 미장", payload)
+
+  # 3) 이더 vs 비트 — ETH/BTC 비율. 낮을수록 이더가 눌림.
+  payload = None
+  eth_p, btc_p = raw_map.get("ETH"), raw_map.get("BTC")
+  if eth_p and btc_p:
+    eth_btc_ratio = round(eth_p / btc_p, 4)
+    eth_cheap = eth_btc_ratio <= 0.050
+    payload = _ratio(
+        "이더 vs 비트",
+        "이더",
+        "비트",
+        eth_cheap,
+        _dominance(eth_btc_ratio, 0.050, 0.025),
+        (
+            f"이더 쪽이 비트보다 상대적으로 싸요 (ETH/BTC {eth_btc_ratio:.4f})"
+            if eth_cheap
+            else f"비트 쪽이 이더보다 상대적으로 싸요 (ETH/BTC {eth_btc_ratio:.4f})"
+        ),
+    )
+  _add_ratio("이더 vs 비트", payload)
+
+  # 4) 장기채 vs 단기채 — TLT/SGOV 비율. 낮을수록 장기채가 눌린 상태.
+  payload = None
+  tlt_p, sgov_p = raw_map.get("TLT"), raw_map.get("SGOV")
+  if tlt_p and sgov_p:
+    tlt_sgov_ratio = round(tlt_p / sgov_p, 2)
+    long_cheap = tlt_sgov_ratio <= 0.90
+    payload = _ratio(
+        "장기채 vs 단기채",
+        "장기채",
+        "단기채",
+        long_cheap,
+        _dominance(tlt_sgov_ratio, 0.90, 0.18),
+        (
+            "장기채가 더 눌려 있어 반등 여지가 커요"
+            f" (TLT/SGOV {tlt_sgov_ratio:.2f})"
+            if long_cheap
+            else "장기채가 비싸 단기채 파킹이 유리해요"
+            f" (TLT/SGOV {tlt_sgov_ratio:.2f})"
+        ),
+    )
+  _add_ratio("장기채 vs 단기채", payload)
+
+  # 5) 성장주 vs 배당주 — QQQ/SCHD 비율. 높을수록 배당주가 눌림.
+  payload = None
+  qqq_p, schd_p = raw_map.get("QQQ"), raw_map.get("SCHD")
+  if qqq_p and schd_p:
+    qs_ratio = round(qqq_p / schd_p, 1)
+    dividend_cheap = qs_ratio >= 16.0
+    payload = _ratio(
+        "성장주 vs 배당주",
+        "성장주",
+        "배당주",
+        not dividend_cheap,
+        _dominance(qs_ratio, 16.0, 5.0),
+        (
+            f"배당주 쪽이 성장주보다 상대적으로 싸요 (QQQ/SCHD {qs_ratio:.1f})"
+            if dividend_cheap
+            else f"성장주 쪽이 배당주보다 상대적으로 싸요 (QQQ/SCHD {qs_ratio:.1f})"
+        ),
+    )
+  _add_ratio("성장주 vs 배당주", payload)
+
+  # 6) 구리 vs 금 — CPER/GLD 환산 비율. 낮을수록 구리가 눌림(경기 회복 시 여지).
+  payload = None
+  cper_p = raw_map.get("CPER")
+  if cper_p and gld_p:
+    cg_ratio = round((cper_p * 10) / gld_p, 2)
+    copper_cheap = cg_ratio <= 1.25
+    payload = _ratio(
+        "구리 vs 금",
+        "구리",
+        "금",
+        copper_cheap,
+        _dominance(cg_ratio, 1.25, 0.35),
+        (
+            f"구리 쪽이 금보다 상대적으로 싸요 (CPER/GLD {cg_ratio:.2f})"
+            if copper_cheap
+            else f"금 쪽이 구리보다 상대적으로 싸요 (CPER/GLD {cg_ratio:.2f})"
+        ),
+    )
+  _add_ratio("구리 vs 금", payload)
 
   market = {
       "kimchi": kimchi,

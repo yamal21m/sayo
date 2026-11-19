@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026.11.19 17:20 업데이트",
+  "updatedAt": "2026.11.19 21:15 업데이트",
   "categories": [
     {
       "id": "bonds",
@@ -37,15 +37,15 @@
         {
           "ticker": "JPY/KRW",
           "name": "엔화 환율 (100엔)",
-          "price": "830원",
-          "chg1d": -0.7,
-          "chg1w": -0.8,
+          "price": "828원",
+          "chg1d": -0.9,
+          "chg1w": -1.0,
           "score": 88,
           "s1": 32,
           "s2": 22,
           "s3": 20,
           "s4": 14,
-          "comment": "200일 평균선 대비 유리한 구간이며 고점 대비 -14.4% 할인 중입니다. 장기 적립 비중을 늘리기 좋은 초록불 구간입니다.",
+          "comment": "200일 평균선 대비 유리한 구간이며 고점 대비 -14.6% 할인 중입니다. 장기 적립 비중을 늘리기 좋은 초록불 구간입니다.",
           "asof": "2026-11-19"
         },
         {
@@ -65,15 +65,15 @@
         {
           "ticker": "USD/KRW",
           "name": "달러 환율",
-          "price": "1,330원",
-          "chg1d": -0.2,
-          "chg1w": -0.5,
-          "score": 82,
+          "price": "1,329원",
+          "chg1d": -0.3,
+          "chg1w": -0.6,
+          "score": 83,
           "s1": 31,
-          "s2": 18,
+          "s2": 19,
           "s3": 19,
           "s4": 14,
-          "comment": "200일 평균선 대비 유리한 구간이며 고점 대비 -14.4% 할인 중입니다. 장기 적립 비중을 늘리기 좋은 초록불 구간입니다.",
+          "comment": "200일 평균선 대비 유리한 구간이며 고점 대비 -14.5% 할인 중입니다. 장기 적립 비중을 늘리기 좋은 초록불 구간입니다.",
           "asof": "2026-11-19"
         }
       ]
@@ -296,29 +296,29 @@
         {
           "ticker": "BTC",
           "name": "비트코인 (Bitcoin)",
-          "price": "$63,697",
-          "chg1d": 1.1,
-          "chg1w": -0.7,
+          "price": "$63,747",
+          "chg1d": 1.2,
+          "chg1w": -0.6,
           "score": 96,
           "s1": 35,
           "s2": 30,
           "s3": 17,
           "s4": 14,
-          "comment": "200일 평균선 대비 유리한 구간이며 고점 대비 -34.3% 할인 중입니다. 장기 적립 비중을 늘리기 좋은 초록불 구간입니다.",
+          "comment": "200일 평균선 대비 유리한 구간이며 고점 대비 -34.2% 할인 중입니다. 장기 적립 비중을 늘리기 좋은 초록불 구간입니다.",
           "asof": "2026-11-19"
         },
         {
           "ticker": "SOL",
           "name": "솔라나 (Solana)",
-          "price": "$74.5",
-          "chg1d": 1.2,
-          "chg1w": 6.2,
+          "price": "$74.7",
+          "chg1d": 1.4,
+          "chg1w": 6.4,
           "score": 96,
           "s1": 35,
           "s2": 30,
           "s3": 17,
           "s4": 14,
-          "comment": "200일 평균선 대비 유리한 구간이며 고점 대비 -49.2% 할인 중입니다. 장기 적립 비중을 늘리기 좋은 초록불 구간입니다.",
+          "comment": "200일 평균선 대비 유리한 구간이며 고점 대비 -49.1% 할인 중입니다. 장기 적립 비중을 늘리기 좋은 초록불 구간입니다.",
           "asof": "2026-11-19"
         }
       ]
@@ -326,47 +326,65 @@
   ],
   "ratios": [
     {
-      "title": "금 vs 은 (ETF 상대 비율)",
-      "winner": "은(SLV) 저평가 우위",
-      "desc": "현재 GLD/SLV 환산비율 83.8 (높을수록 은이 상대적으로 저렴)",
-      "pct": 83
+      "title": "금 vs 은",
+      "left": "금",
+      "right": "은",
+      "winnerSide": "right",
+      "winner": "은 81% 우세",
+      "pct": 81,
+      "desc": "은 쪽이 금보다 상대적으로 많이 눌려 있어요 (금/은 83.8배)"
     },
     {
-      "title": "크립토 공포·탐욕 지수 (BTC 심리)",
-      "winner": "공포 구간 (매수 유리)",
-      "desc": "현재 크립토 투자 심리 10점 · 극단적 공포 (alternative.me 기준, 낮을수록 대중이 공포에 떤 바닥권)",
-      "pct": 90
+      "title": "국장 vs 미장",
+      "left": "코스피",
+      "right": "나스닥",
+      "winnerSide": "left",
+      "winner": "코스피 95% 우세",
+      "pct": 95,
+      "desc": "코스피 쪽이 더 눌려 있어요 (1년 고점 대비 -43.6% vs 나스닥 -13.2%)"
     },
     {
-      "title": "이더 vs 비트 (ETH / BTC 비율)",
-      "winner": "이더리움(ETH) 저평가 우위",
-      "desc": "현재 ETH/BTC 비율 0.0283 (0.040 이하 시 이더·알트 가성비 바닥 매력)",
-      "pct": 81
+      "title": "이더 vs 비트",
+      "left": "이더",
+      "right": "비트",
+      "winnerSide": "left",
+      "winner": "이더 89% 우세",
+      "pct": 89,
+      "desc": "이더 쪽이 비트보다 상대적으로 싸요 (ETH/BTC 0.0283)"
     },
     {
-      "title": "장기채 vs 단기채 (TLT / SGOV)",
-      "winner": "장기채(TLT) 반등 차익 우위",
-      "desc": "현재 TLT/SGOV 비율 0.80 (낮을수록 장기 금리 상단·차익 메리트)",
-      "pct": 85
+      "title": "장기채 vs 단기채",
+      "left": "장기채",
+      "right": "단기채",
+      "winnerSide": "left",
+      "winner": "장기채 75% 우세",
+      "pct": 75,
+      "desc": "장기채가 더 눌려 있어 반등 여지가 커요 (TLT/SGOV 0.80)"
     },
     {
-      "title": "성장주 vs 배당주 (QQQ / SCHD)",
-      "winner": "배당주(SCHD) 저평가 우위",
-      "desc": "현재 QQQ/SCHD 비율 19.0 (높을수록 나스닥 대비 배당가치주 가성비 상승)",
-      "pct": 80
+      "title": "성장주 vs 배당주",
+      "left": "성장주",
+      "right": "배당주",
+      "winnerSide": "right",
+      "winner": "배당주 77% 우세",
+      "pct": 77,
+      "desc": "배당주 쪽이 성장주보다 상대적으로 싸요 (QQQ/SCHD 19.0)"
     },
     {
-      "title": "구리 vs 금 (CPER / GLD 경기 선행)",
-      "winner": "구리(CPER) 반등 가성비 우위",
-      "desc": "현재 CPER/GLD 환산비율 1.00 (낮을수록 실물 경기 회복 시 구리 잠재력 우위)",
-      "pct": 85
+      "title": "구리 vs 금",
+      "left": "구리",
+      "right": "금",
+      "winnerSide": "left",
+      "winner": "구리 82% 우세",
+      "pct": 82,
+      "desc": "구리 쪽이 금보다 상대적으로 싸요 (CPER/GLD 1.00)"
     }
   ],
   "market": {
     "kimchi": {
-      "premium": 1.82,
-      "upbitKrw": 86398000,
-      "overseasUsd": 63691.71,
+      "premium": 1.86,
+      "upbitKrw": 86497000,
+      "overseasUsd": 63740.72,
       "usdKrw": 1332.22,
       "usdSource": "Coinbase",
       "fxSource": "open.er-api.com"
@@ -377,10 +395,10 @@
       "labelKo": "극단적 공포"
     },
     "usFng": {
-      "value": 23.5,
-      "label": "extreme fear",
-      "labelKo": "극단적 공포",
-      "timestamp": "2026-11-19T01:59:54+00:00",
+      "value": 26.5,
+      "label": "fear",
+      "labelKo": "공포",
+      "timestamp": "2026-11-19T11:58:46+00:00",
       "previousClose": 24.6,
       "previous1Week": 40.3,
       "previous1Month": 19.5,
@@ -417,9 +435,9 @@
         {
           "key": "market_volatility_vix",
           "name": "VIX 변동성",
-          "score": 29.1,
-          "rating": "fear",
-          "labelKo": "공포"
+          "score": 50.0,
+          "rating": "neutral",
+          "labelKo": "중립"
         },
         {
           "key": "junk_bond_demand",
@@ -445,10 +463,10 @@
       "source": "CNN Fear & Greed"
     },
     "vix": {
-      "value": 24.56,
-      "chg1d": -3.53,
-      "chg1w": 40.42,
-      "asof": "2026-11-18",
+      "value": 22.08,
+      "chg1d": -10.1,
+      "chg1w": 18.07,
+      "asof": "2026-11-19",
       "labelKo": "긴장"
     },
     "move": {

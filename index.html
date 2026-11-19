@@ -82,7 +82,10 @@
 
     <!-- 4단: 상대 가성비 판독기 -->
     <section class="bg-slate-900/70 border border-slate-800 rounded-2xl p-4">
-      <h2 class="text-sm font-bold text-slate-300 mb-3">⚖️ 둘 중 뭐가 더 쌀까? (상대 가성비)</h2>
+      <div class="flex items-end justify-between gap-2 mb-3">
+        <h2 class="text-sm font-bold text-slate-300">⚖️ 둘 중 뭐가 더 쌀까? (상대 가성비)</h2>
+        <span class="text-[10px] text-slate-500 whitespace-nowrap">막대가 길수록 그쪽이 더 싸요</span>
+      </div>
       <div id="ratios-list" class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs"></div>
     </section>
 
@@ -112,7 +115,6 @@
           <div id="us-fng-marker" class="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-1.5 h-5 rounded-full bg-white ring-2 ring-slate-900 transition-all" style="left:50%"></div>
         </div>
         <div class="flex justify-between text-[10px] text-slate-500 mt-1"><span>극단적 공포 0</span><span>중립 50</span><span>극단적 탐욕 100</span></div>
-        <p id="us-fng-detail" class="text-[11px] text-slate-400 mt-2 leading-relaxed">CNN이 S&amp;P500 모멘텀·시장 폭·풋/콜·VIX 등 7개 지표를 합산한 미국 주식 심리 지수입니다.</p>
         <div id="us-fng-components" class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 mt-3"></div>
       </div>
 
@@ -125,15 +127,14 @@
             <span id="fng-live" class="text-[10px] text-slate-500 bg-slate-800 px-2 py-0.5 rounded-full whitespace-nowrap">불러오는 중…</span>
           </div>
           <div class="flex items-end gap-1.5 mt-1.5">
-            <span id="fng-value" class="text-3xl font-extrabold leading-none text-slate-400">—</span>
-            <span class="text-[11px] text-slate-500 mb-1">/ 100</span>
-            <span id="fng-badge" class="text-[11px] font-extrabold px-2 py-0.5 mb-0.5 rounded-full border border-slate-700 text-slate-400 ml-auto">—</span>
+            <span id="fng-value" class="text-4xl font-extrabold leading-none text-slate-400">—</span>
+            <span class="text-[11px] text-slate-500 mb-1.5">/ 100</span>
+            <span id="fng-badge" class="text-[11px] font-extrabold px-2 py-0.5 mb-1 rounded-full border border-slate-700 text-slate-400 ml-auto">—</span>
           </div>
           <div class="relative h-2.5 rounded-full mt-3" style="background:linear-gradient(90deg,#f43f5e 0%,#fb7185 25%,#f59e0b 45%,#facc15 55%,#34d399 75%,#059669 100%)">
             <div id="fng-marker" class="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-1.5 h-4 rounded-full bg-white ring-2 ring-slate-900 transition-all" style="left:50%"></div>
           </div>
           <div class="flex justify-between text-[10px] text-slate-500 mt-1"><span>극단적 공포 0</span><span>중립 50</span><span>극단적 탐욕 100</span></div>
-          <p id="fng-detail" class="text-[11px] text-slate-400 mt-2 leading-relaxed">alternative.me의 비트코인 중심 크립토 심리 지수입니다.</p>
         </div>
 
         <!-- 🧭 김치 프리미엄 (BTC) -->
@@ -318,8 +319,13 @@
       if (ratios) {
         ratios.innerHTML = Array.from({ length: 6 }).map(() => `
           <div class="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3 animate-pulse">
-            <div class="h-3 w-2/3 bg-slate-800 rounded mb-2"></div>
-            <div class="h-2 w-full bg-slate-800 rounded-full"></div>
+            <div class="flex items-center justify-between mb-2">
+              <div class="h-2.5 w-8 bg-slate-800 rounded"></div>
+              <div class="h-2.5 w-16 bg-slate-800 rounded-full"></div>
+              <div class="h-2.5 w-8 bg-slate-800 rounded"></div>
+            </div>
+            <div class="h-2.5 w-full bg-slate-800 rounded-full"></div>
+            <div class="h-2 w-2/3 bg-slate-800 rounded mt-2"></div>
           </div>`).join('');
       }
     }
@@ -471,23 +477,50 @@
       document.getElementById('drawer-section').classList.add('hidden');
     }
 
+    const RATIO_TONE = {
+      strong: { bar: 'bg-emerald-400', text: 'text-emerald-300', badge: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40' },
+      mid:    { bar: 'bg-sky-400',     text: 'text-sky-300',     badge: 'bg-sky-500/15 text-sky-300 border-sky-500/40' },
+      weak:   { bar: 'bg-amber-400',   text: 'text-amber-300',   badge: 'bg-amber-500/15 text-amber-300 border-amber-500/40' },
+      flat:   { bar: 'bg-slate-500',   text: 'text-slate-300',   badge: 'bg-slate-700/50 text-slate-300 border-slate-600' }
+    };
+
+    // 우위 강도 색 구분: 80%+ 진한 에메랄드 / 65~79 하늘색 / 55~64 호박색 / 그 미만 중립
+    function ratioTone(pct) {
+      if (pct >= 80) return RATIO_TONE.strong;
+      if (pct >= 65) return RATIO_TONE.mid;
+      if (pct >= 55) return RATIO_TONE.weak;
+      return RATIO_TONE.flat;
+    }
+
     function renderRatios() {
-      let html = '';
-      appData.ratios.forEach(r => {
-        html += `
+      const list = document.getElementById('ratios-list');
+      if (!list) return;
+      if (!appData || !Array.isArray(appData.ratios) || !appData.ratios.length) {
+        list.innerHTML = '<p class="text-xs text-slate-500">비교 데이터를 받지 못했습니다.</p>';
+        return;
+      }
+      list.innerHTML = appData.ratios.map(r => {
+        const pct = Math.max(50, Math.min(95, Number(r.pct) || 50));
+        const tone = ratioTone(pct);
+        const leftWins = r.winnerSide === 'left';
+        // 중앙(50%)에서 우세 쪽으로 얼마나 쏠리는지: 우위 강도만큼 반쪽 트랙을 채움
+        const fill = Math.max(4, ((pct - 50) / 45) * 50).toFixed(1);
+        const barStyle = (leftWins ? 'right:50%' : 'left:50%') + '; width:' + fill + '%';
+        return `
           <div class="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3">
-            <div class="flex justify-between font-bold mb-1">
-              <span class="text-slate-300">${r.title}</span>
-              <span class="text-emerald-400">${r.winner}</span>
+            <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 mb-2">
+              <span class="text-[11px] font-bold truncate ${leftWins ? tone.text : 'text-slate-500'}">${r.left}</span>
+              <span class="text-[10px] font-extrabold px-1.5 py-0.5 rounded-full border whitespace-nowrap ${tone.badge}">${r.winner}</span>
+              <span class="text-[11px] font-bold truncate text-right ${leftWins ? 'text-slate-500' : tone.text}">${r.right}</span>
             </div>
-            <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden my-1.5">
-              <div class="bg-emerald-400 h-full" style="width:${r.pct}%"></div>
+            <div class="relative h-2.5 rounded-full bg-slate-800/90 overflow-hidden">
+              <div class="absolute inset-y-0 left-1/2 w-px bg-slate-600"></div>
+              <div class="absolute inset-y-0 rounded-full ${tone.bar} transition-all duration-500" style="${barStyle}"></div>
             </div>
-            <p class="text-slate-400 text-[11px]">${r.desc}</p>
+            <p class="text-[11px] text-slate-400 mt-1.5 leading-snug">${r.desc}</p>
           </div>
         `;
-      });
-      document.getElementById('ratios-list').innerHTML = html;
+      }).join('');
     }
 
     function openModal(ticker) {
@@ -681,14 +714,6 @@
       return { label: '극단적 탐욕', cls: 'bg-emerald-500/25 text-emerald-200 border-emerald-400/60', text: 'text-emerald-300' };
     }
 
-    function fngComment(v) {
-      if (v <= 24) return '대중이 겁에 질린 바닥권 — 역발상 분할 매수 후보 구간입니다.';
-      if (v <= 44) return '공포가 우세한 구간 — 정해진 날짜의 분할 적립에 유리합니다.';
-      if (v <= 55) return '과열도 공포도 없는 중립 구간입니다.';
-      if (v <= 75) return '탐욕이 우세한 구간 — 추격 매수는 줄이는 편이 좋습니다.';
-      return '과열 극단 구간 — 신규 매수는 미루고 현금 비중을 점검하세요.';
-    }
-
     function fmtWon(n) { return Math.round(n).toLocaleString('ko-KR') + '원'; }
     function fmtUsd(n) { return '$' + Number(n).toLocaleString('en-US', { maximumFractionDigits: 0 }); }
 
@@ -739,7 +764,6 @@
       const valueEl = document.getElementById('us-fng-value');
       const badge = document.getElementById('us-fng-badge');
       const marker = document.getElementById('us-fng-marker');
-      const detail = document.getElementById('us-fng-detail');
       const live = document.getElementById('us-fng-live');
       const comps = document.getElementById('us-fng-components');
       if (!valueEl) return;
@@ -751,7 +775,6 @@
         badge.className = 'text-[11px] font-extrabold px-2 py-0.5 mb-1 rounded-full border border-slate-700 text-slate-400 ml-auto';
         marker.style.left = '50%';
         live.textContent = '대기 중';
-        detail.textContent = '미장 지수를 아직 받지 못했어요. 다음 자동 갱신(하루 3회)을 기다려 주세요.';
         comps.innerHTML = '';
         return;
       }
@@ -764,13 +787,6 @@
       badge.className = 'text-[11px] font-extrabold px-2 py-0.5 mb-1 rounded-full border ml-auto ' + tone.cls;
       marker.style.left = Math.min(99, Math.max(1, v)) + '%';
       live.textContent = us.timestamp ? '기준 ' + String(us.timestamp).slice(5, 10).replace('-', '/') : '자동 갱신';
-
-      const parts = [];
-      if (us.previousClose != null) parts.push('전일 ' + Number(us.previousClose).toFixed(1));
-      if (us.previous1Week != null) parts.push('1주 전 ' + Number(us.previous1Week).toFixed(1));
-      if (us.previous1Month != null) parts.push('1달 전 ' + Number(us.previous1Month).toFixed(1));
-      detail.innerHTML = fngComment(v)
-        + (parts.length ? '<br><span class="text-slate-500">' + parts.join(' · ') + ' (0=극단적 공포, 100=극단적 탐욕)</span>' : '');
 
       const list = us.components || [];
       comps.innerHTML = list.length
@@ -899,27 +915,22 @@
       const fValue = document.getElementById('fng-value');
       const fBadge = document.getElementById('fng-badge');
       const fMarker = document.getElementById('fng-marker');
-      const fDetail = document.getElementById('fng-detail');
       const fLive = document.getElementById('fng-live');
 
       if (fng && fng.value != null && isFinite(Number(fng.value))) {
         const v = Math.min(100, Math.max(0, Math.round(Number(fng.value))));
         const tone = fngTone(v);
         fValue.textContent = String(v);
-        fValue.className = 'text-3xl font-extrabold leading-none ' + tone.text;
+        fValue.className = 'text-4xl font-extrabold leading-none ' + tone.text;
         fBadge.textContent = tone.label;
-        fBadge.className = 'text-[11px] font-extrabold px-2 py-0.5 mb-0.5 rounded-full border ml-auto ' + tone.cls;
+        fBadge.className = 'text-[11px] font-extrabold px-2 py-0.5 mb-1 rounded-full border ml-auto ' + tone.cls;
         fMarker.style.left = Math.min(99, Math.max(1, v)) + '%';
-        fDetail.textContent = fngComment(v) + ' (alternative.me · BTC 중심)';
         fLive.textContent = marketState.fng ? stampLive : (cache && cache.fng ? stampCache : '자동 갱신');
       } else {
         fValue.textContent = '—';
-        fValue.className = 'text-3xl font-extrabold leading-none text-slate-400';
+        fValue.className = 'text-4xl font-extrabold leading-none text-slate-400';
         fBadge.textContent = marketTried ? '집계 불가' : '대조 중';
-        fBadge.className = 'text-[11px] font-extrabold px-2 py-0.5 mb-0.5 rounded-full border border-slate-700 text-slate-400 ml-auto';
-        fDetail.textContent = marketTried
-          ? '지수를 불러오지 못했어요. 잠시 후 새로고침해 주세요.'
-          : 'alternative.me의 크립토 심리 지수를 대조하는 중입니다.';
+        fBadge.className = 'text-[11px] font-extrabold px-2 py-0.5 mb-1 rounded-full border border-slate-700 text-slate-400 ml-auto';
         fLive.textContent = marketTried ? '연결 실패' : '불러오는 중…';
       }
     }
