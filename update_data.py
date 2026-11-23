@@ -10,7 +10,7 @@ import yfinance as yf
 
 # 한국 시간(KST) 표시용
 KST = timezone(timedelta(hours=9))
-now_str = datetime.now(KST).strftime("%Y.%m.%d %H:%M 업데이트")
+now_str = datetime.now(KST).strftime("%Y.%m.%d %H:%M KST 업데이트")
 
 
 def load_previous_state():
@@ -571,6 +571,10 @@ def analyze_ticker(
       )
       high_1y = max(closes)
       low_1y = min(closes)
+      # 1년 고점이 언제였는지(문구에 날짜를 병기해 기준 시점을 분명히 함)
+      high_date = str(
+          closes_series.index[max(range(len(closes)), key=lambda i: closes[i])].date()
+      )
       rsi = calc_rsi(closes)
 
       # [채점 1] 200일 평균선 대비 위치 (35점 만점: 평균선보다 낮을수록 고득점)
@@ -643,6 +647,7 @@ def analyze_ticker(
           "raw_price": curr,
           # 1년 고점 대비 할인율: '국장 vs 미장' 상대 비교에 씁니다(저장 전 제거).
           "raw_mdd": round(mdd_pct, 2),
+          "raw_high_date": high_date,
       }
     except Exception as e:
       print(f"Error on {display_ticker} (attempt {attempt}/{max_retries}): {e}")
@@ -763,6 +768,7 @@ def main():
   categories = []
   raw_map = {}
   mdd_map = {}
+  high_date_map = {}
 
   for cid, icon, cname, tickers in config:
     items = []
@@ -783,10 +789,13 @@ def main():
       if res:
         raw_price = res.pop("raw_price", None)
         raw_mdd = res.pop("raw_mdd", None)
+        raw_high_date = res.pop("raw_high_date", None)
         if raw_price is not None:
           raw_map[disp_t] = raw_price
         if raw_mdd is not None:
           mdd_map[disp_t] = raw_mdd
+        if raw_high_date:
+          high_date_map[disp_t] = raw_high_date
         items.append(res)
     if items:
       categories.append(
@@ -864,8 +873,20 @@ def main():
   #    지수 레벨은 서로 비교할 수 없어, '고점에서 얼마나 눌렸는지'를 기준으로 봅니다.
   payload = None
   kospi_mdd, qqq_mdd = mdd_map.get("KOSPI"), mdd_map.get("QQQ")
+  kospi_high, qqq_high = high_date_map.get("KOSPI"), high_date_map.get("QQQ")
+
+  def _md(date_str):
+    """'2026-06-22' → '6/22' (고점 날짜를 짧게)"""
+    try:
+      _, m, d = str(date_str).split("-")
+      return f"{int(m)}/{int(d)}"
+    except Exception:
+      return str(date_str)
+
   if kospi_mdd is not None and qqq_mdd is not None:
     kospi_cheap = kospi_mdd >= qqq_mdd
+    kospi_high_txt = f"({_md(kospi_high)})" if kospi_high else ""
+    qqq_high_txt = f"({_md(qqq_high)})" if qqq_high else ""
     payload = _ratio(
         "국장 vs 미장",
         "코스피",
@@ -873,11 +894,11 @@ def main():
         kospi_cheap,
         _dominance(kospi_mdd - qqq_mdd, 0.0, 15.0),
         (
-            f"코스피 쪽이 더 눌려 있어요 (1년 고점 대비 -{kospi_mdd:.1f}%"
-            f" vs 나스닥 -{qqq_mdd:.1f}%)"
+            f"코스피 쪽이 더 눌려 있어요 (1년 고점{kospi_high_txt} 대비 -{kospi_mdd:.1f}%"
+            f" vs 나스닥 고점{qqq_high_txt} 대비 -{qqq_mdd:.1f}%)"
             if kospi_cheap
-            else f"나스닥 쪽이 더 눌려 있어요 (1년 고점 대비 -{qqq_mdd:.1f}%"
-            f" vs 코스피 -{kospi_mdd:.1f}%)"
+            else f"나스닥 쪽이 더 눌려 있어요 (1년 고점{qqq_high_txt} 대비 -{qqq_mdd:.1f}%"
+            f" vs 코스피 고점{kospi_high_txt} 대비 -{kospi_mdd:.1f}%)"
         ),
     )
   _add_ratio("국장 vs 미장", payload)
