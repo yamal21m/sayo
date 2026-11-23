@@ -1090,7 +1090,7 @@
             const s = Math.max(0, Math.min(100, Number(c.score)));
             const t = fngTone(s);
             return '<div class="flex items-center gap-2">'
-              + '<span class="text-[11px] text-slate-400 w-[8.5rem] truncate">' + c.name + '</span>'
+              + '<span class="text-[11px] text-slate-400 w-[8.5rem] truncate">' + c.name + ' </span>'
               + '<div class="flex-1 bg-slate-800 h-1.5 rounded-full overflow-hidden"><div class="h-full rounded-full ' + fngBarColor(s) + '" style="width:' + s + '%"></div></div>'
               + '<span class="text-[11px] font-bold ' + t.text + ' w-7 text-right">' + Math.round(s) + '</span>'
               + '</div>';
