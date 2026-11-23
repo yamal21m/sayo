@@ -12,6 +12,11 @@
     body { font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif; background-color: #0b0f19; color: #f1f5f9; }
     .card-hover { transition: all 0.2s ease; }
     .card-hover:hover { transform: translateY(-2px); border-color: #38bdf8; }
+    /* ⚡ 이상 징후 레이더 제목: 실제로 누를 수 있는 버튼임을 드러내는 스타일 */
+    .radar-btn { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: #94a3b8; background: transparent; border: 0; padding: 2px 0; cursor: pointer; text-align: left; }
+    .radar-btn:hover { color: #f1f5f9; }
+    .radar-btn:focus-visible { outline: 2px solid #38bdf8; outline-offset: 3px; border-radius: 6px; }
+    .radar-btn .radar-more { font-size: 11px; font-weight: 600; color: #38bdf8; white-space: nowrap; }
   </style>
 </head>
 <body class="min-h-screen pb-16">
@@ -26,8 +31,11 @@
         </div>
         <p class="text-sm font-bold text-sky-400 mt-0.5">"그래서 지금 사요?" <span class="text-xs font-normal text-slate-400">— 6대 자산 바겐세일 신호등</span></p>
       </div>
-      <div class="flex flex-row sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-1.5 w-full sm:w-auto">
-        <span id="update-time" class="text-xs text-slate-400 bg-slate-800 px-2.5 py-1 rounded-full whitespace-nowrap">시세 데이터 불러오는 중…</span>
+      <div class="flex flex-col items-end gap-1.5 w-full sm:w-auto">
+        <div class="flex flex-wrap items-center justify-end gap-1.5">
+          <span id="update-time" class="text-xs text-slate-400 bg-slate-800 px-2.5 py-1 rounded-full whitespace-nowrap" title="시세·지표 스냅샷 파일(data.json)이 만들어진 시각입니다. 하루 3회(07·16·23시 무렵) GitHub Actions로 갱신되며 지연될 수 있습니다.">시세 스냅샷 불러오는 중…</span>
+          <span id="update-age" class="hidden text-xs font-bold text-amber-300 bg-amber-500/15 border border-amber-500/40 px-2 py-1 rounded-full whitespace-nowrap" title="마지막 스냅샷이 만들어진 뒤 지난 시간입니다. 다음 자동 갱신 전까지는 이전 값을 보여 줍니다."></span>
+        </div>
         <div id="visitor-stats" class="text-[11px] text-slate-400 flex items-center gap-1.5 font-medium pr-1 whitespace-nowrap" title="방문자 수 — 같은 기기에서는 하루 1회만 집계됩니다 (KST 기준)">
           <span class="text-slate-500">👥 방문자</span>
           <span>오늘 <strong id="visitor-today" class="text-slate-300 font-semibold">—</strong></span>
@@ -56,7 +64,10 @@
     <!-- 1단: 일간/주간 급락·급등 알약 티커 -->
     <section class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4">
       <div class="flex items-center justify-between mb-3">
-        <span class="text-xs font-bold text-slate-400">⚡ 이상 징후 레이더 (클릭 시 상세)</span>
+        <button type="button" id="movers-btn" onclick="openMoversDrawer()" aria-expanded="false" aria-controls="drawer-section" title="지금 고른 기간의 20종목 등락률 전체 순위를 엽니다" class="radar-btn">
+          <span>⚡ 이상 징후 레이더</span>
+          <span class="radar-more">전체 보기 ›</span>
+        </button>
         <div class="inline-flex bg-slate-800 rounded-lg p-0.5 text-xs">
           <button id="btn-1d" onclick="setPeriod('1D')" class="px-2.5 py-1 rounded-md font-bold bg-sky-500 text-slate-950 whitespace-nowrap">오늘(1D)</button>
           <button id="btn-1w" onclick="setPeriod('1W')" class="px-2.5 py-1 rounded-md font-semibold text-slate-400 whitespace-nowrap">이번 주(1W)</button>
@@ -327,7 +338,7 @@
     // 로딩 중 스켈레톤 (실제 시세처럼 보이는 숫자는 하나도 없음)
     function renderLoading() {
       dataState = 'loading';
-      setText('update-time', '시세 데이터 불러오는 중…');
+      setText('update-time', '시세 스냅샷 불러오는 중…');
       const top = document.getElementById('top-summary');
       if (top) top.innerHTML = '<span class="text-slate-400 font-semibold">오늘 가장 싼 자산을 계산하는 중입니다…</span>';
       const pills = document.getElementById('mover-pills');
@@ -383,12 +394,49 @@
       return { label: "🔴 참아 봐요!", cls: "bg-rose-500/20 text-rose-300 border-rose-500/40", textCls: "text-rose-400" };
     }
 
-    // data.json 의 updatedAt 은 KST 로 만들어진 문자열입니다. 'KST' 를 붙여 기준 시각을 분명히 합니다.
-    function formatUpdatedAt(raw) {
-      if (!raw) return '갱신 시각 정보 없음';
+    // data.json 의 updatedAt 은 KST 로 만들어진 문자열입니다. 'KST' 를 붙여 기준 시각을 분명히 하고,
+    // 이는 시세·지표 스냅샷 파일이 만들어진 시각임을 '시세 스냅샷' 으로 명시합니다.
+    function updatedAtClock(raw) {
+      if (!raw) return null;
       let t = String(raw).replace(/\s*업데이트\s*$/, '').trim();
+      if (!t) return null;
       if (!/KST/i.test(t)) t += ' KST';
-      return t + ' 기준';
+      return t;
+    }
+
+    function formatUpdatedAt(raw) {
+      const t = updatedAtClock(raw);
+      return t ? '시세 스냅샷 ' + t : '시세 스냅샷 시각 정보 없음';
+    }
+
+    // '2026.11.23 07:39' (KST 문자열) → epoch ms. 형식이 다르면 null.
+    function parseUpdatedAt(raw) {
+      const m = String(raw || '').match(/(\d{4})\.(\d{2})\.(\d{2})\s+(\d{2}):(\d{2})/);
+      if (!m) return null;
+      return Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4]), Number(m[5])) - 9 * 3600 * 1000;
+    }
+
+    // 스냅샷이 4시간 이상 지났으면 '· N시간 전' (하루를 넘으면 'N일 M시간 전'), 아니면 null
+    function snapshotAgeText(raw) {
+      const ts = parseUpdatedAt(raw);
+      if (ts == null) return null;
+      const hours = Math.floor((Date.now() - ts) / 3600000);
+      if (hours < 4) return null;
+      if (hours >= 24) return '· ' + Math.floor(hours / 24) + '일 ' + (hours % 24) + '시간 전';
+      return '· ' + hours + '시간 전';
+    }
+
+    function renderSnapshotAge() {
+      const el = document.getElementById('update-age');
+      if (!el) return;
+      const text = appData ? snapshotAgeText(appData.updatedAt) : null;
+      if (text) {
+        el.textContent = text;
+        el.classList.remove('hidden');
+      } else {
+        el.textContent = '';
+        el.classList.add('hidden');
+      }
     }
 
     // '2026-11-20' → '11/20 종가' (목록·카드의 asof 표기 통일)
@@ -397,6 +445,12 @@
       const m = String(asof).match(/^(\d{4})-(\d{2})-(\d{2})/);
       if (!m) return String(asof) + (suffix || '');
       return Number(m[2]) + '/' + Number(m[3]) + (suffix === false ? '' : ' 종가');
+    }
+
+    // 행의 종가 라벨은 '가격의 기준일'임을 명시 (등락률 기간은 따로 붙입니다)
+    function priceBasisLabel(it) {
+      const a = asofLabel(it.asof);
+      return a === '기준일 미상' ? '가격 기준 미상' : '가격 기준 ' + a;
     }
 
     // KST 기준 'HH:MM' (보는 사람의 기기 시간대와 무관하게 통일)
@@ -417,8 +471,12 @@
       if (!appData || !Array.isArray(appData.categories) || !appData.categories.length) return;
       const updatedText = formatUpdatedAt(appData.updatedAt);
       document.getElementById('update-time').textContent = updatedText;
+      renderSnapshotAge();
       const footerUpdated = document.getElementById('footer-updated');
-      if (footerUpdated) footerUpdated.textContent = updatedText;
+      if (footerUpdated) {
+        const clock = updatedAtClock(appData.updatedAt);
+        footerUpdated.textContent = clock ? clock + ' 기준' : updatedText;
+      }
 
       // 최상단 TOP 2 저평가 자산 자동 추출
       const sortedByScore = getAllItems().sort((a, b) => b.score - a.score);
@@ -462,7 +520,7 @@
         const sign = r[key] > 0 ? '+' : '';
         html += `<button onclick="openModal('${r.ticker}')" class="bg-rose-950/80 hover:bg-rose-900 border border-rose-500/40 text-rose-200 px-2.5 py-1 rounded-full font-semibold transition">${r.ticker} ${sign}${r[key]}% <span class="text-rose-300/70 font-normal">· ${r.score}점</span></button>`;
       });
-      html += `<span class="text-[10px] text-slate-500 self-center">점수는 100점 만점 매수 매력도</span>`;
+      html += `<span class="text-[10px] text-slate-500 self-center">등락률 순위(점수와 별개) · 점수는 100점 만점 매수 매력도</span>`;
       document.getElementById('mover-pills').innerHTML = html;
     }
 
@@ -478,7 +536,7 @@
         const activeBorder = selectedCatId === cat.id ? 'border-sky-400 ring-2 ring-sky-400/30' : 'border-slate-800';
         html += `
           <button onclick="openCategory('${cat.id}')" class="card-hover bg-slate-900 border ${activeBorder} rounded-2xl p-4 text-left flex flex-col justify-between h-32">
-            <div class="text-sm font-bold text-slate-200">${cat.icon} ${cat.name}${greensOnly ? ` <span class="text-[10px] font-bold text-emerald-400">🟢 ${greens}</span>` : ''}</div>
+            <div class="text-sm font-bold text-slate-200">${cat.icon} ${cat.name}${greensOnly ? ` <span class="text-[10px] font-bold text-emerald-400" title="이 카테고리의 70점 이상(지금 사요) 종목 ${greens}개">🟢 ${greens}종목</span>` : ''}</div>
             <div class="text-3xl font-extrabold ${sig.textCls} my-1">${avgScore}<span class="text-sm font-normal text-slate-400">점</span><span class="text-[10px] font-normal text-slate-500 ml-1">평균</span></div>
             <div><span class="text-xs font-extrabold px-2.5 py-1 rounded-full border ${sig.cls}">${sig.label}</span></div>
           </button>
@@ -494,7 +552,7 @@
       if (status) {
         if (greensOnly) {
           const greensCount = getAllItems().filter(i => i.score >= 70).length;
-          status.textContent = `필터 적용 중 — 70점 이상 종목이 있는 카테고리 ${cats.length}개 (전체 ${appData.categories.length}개) · 해당 종목 ${greensCount}개`;
+          status.textContent = `필터 적용 중 — 70점 이상 종목이 있는 카테고리 ${cats.length}개 (전체 ${appData.categories.length}개) · 해당 종목 ${greensCount}개 · 🟢 N = 해당 카테고리 70점↑ 종목 수`;
           status.classList.remove('hidden');
         } else {
           status.classList.add('hidden');
@@ -512,6 +570,27 @@
       renderDrawer();
       document.getElementById('drawer-section').classList.remove('hidden');
       document.getElementById('drawer-section').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      syncRadarBtn();
+    }
+
+    // ⚡ 이상 징후 레이더 제목 버튼: 현재 기간의 등락률 순위 전체를 서랍으로 엽니다
+    function openMoversDrawer() {
+      if (!appData) return;
+      selectedCatId = null;
+      drawerMode = { kind: 'movers' };
+      renderCategories();
+      renderDrawer();
+      document.getElementById('drawer-section').classList.remove('hidden');
+      document.getElementById('drawer-section').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      syncRadarBtn();
+    }
+
+    // 레이더 버튼의 aria-expanded 를 현재 서랍 상태와 맞춥니다
+    function syncRadarBtn() {
+      const btn = document.getElementById('movers-btn');
+      if (!btn) return;
+      const open = !!(drawerMode && drawerMode.kind === 'movers' && !document.getElementById('drawer-section').classList.contains('hidden'));
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
     }
 
     // '지금 사요!'만 모아보기: 카테고리 카드까지 실제로 걸러내고, 다시 누르면 전체 보기로 복귀합니다.
@@ -537,6 +616,7 @@
         drawerMode = null;
         document.getElementById('drawer-section').classList.add('hidden');
       }
+      syncRadarBtn();
     }
 
     // 서랍은 drawerMode + currentPeriod 를 읽어서 그립니다 (기간 토글 시 같이 갱신됨)
@@ -548,6 +628,11 @@
       if (drawerMode.kind === 'greens') {
         items = getAllItems().filter(i => i.score >= 70).sort((a, b) => b.score - a.score);
         title = `🟢 전 자산 '지금 사요!' (70점 이상) ${items.length}종목`;
+      } else if (drawerMode.kind === 'movers') {
+        const key = currentPeriod === '1D' ? 'chg1d' : 'chg1w';
+        items = getAllItems().sort((a, b) => b[key] - a[key]);
+        const word = currentPeriod === '1D' ? '오늘' : '이번 주';
+        title = `⚡ ${word} 등락률 전체 ${items.length}종목`;
       } else {
         const cat = appData.categories.find(c => c.id === drawerMode.catId);
         if (!cat) return;
@@ -558,24 +643,27 @@
       const note = document.getElementById('drawer-note');
       if (note) {
         const word = currentPeriod === '1D' ? '오늘' : '이번 주';
-        note.innerHTML = `👇 종목을 한 번 더 누르면 100점 만점 채점 근거가 뜹니다 · 등락률은 <span class="font-bold text-slate-300">${word}(${currentPeriod})</span> 기준`;
+        note.innerHTML = drawerMode.kind === 'movers'
+          ? `👇 <span class="font-bold text-slate-300">${word}(${currentPeriod}) 등락률 순위</span>(점수와 별개) · 종목을 누르면 100점 만점 채점 근거가 뜨고, 행의 날짜는 등락률을 잡은 가격의 종가입니다.`
+          : `👇 종목을 한 번 더 누르면 100점 만점 채점 근거가 뜹니다 · 등락률은 <span class="font-bold text-slate-300">${word}(${currentPeriod})</span> 기준`;
       }
-      document.getElementById('drawer-list').innerHTML = drawerItemsHtml(items);
+      document.getElementById('drawer-list').innerHTML = drawerItemsHtml(items, drawerMode.kind === 'movers');
     }
 
-    function drawerItemsHtml(items) {
+    function drawerItemsHtml(items, withRank) {
       const key = currentPeriod === '1D' ? 'chg1d' : 'chg1w';
       let html = '';
-      items.forEach(it => {
+      items.forEach((it, idx) => {
         const sig = getSignalInfo(it.score);
         const chg = Number(it[key]);
         const chgColor = chg < 0 ? 'text-sky-400' : (chg > 0 ? 'text-rose-400' : 'text-slate-400');
         const sign = chg > 0 ? '+' : '';
+        const rank = withRank ? `<span class="text-[10px] font-bold text-slate-500 mr-1">${idx + 1}.</span>` : '';
         html += `
           <div onclick="openModal('${it.ticker}')" class="cursor-pointer bg-slate-950/70 hover:bg-slate-800/80 border border-slate-800 rounded-xl px-3.5 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 sm:gap-2 transition">
             <div class="min-w-0 sm:flex-1">
-              <div class="truncate"><span class="font-extrabold text-white text-sm">${it.ticker}</span><span class="text-xs text-slate-400 ml-1.5">${it.name}</span></div>
-              <div class="text-[10px] text-slate-500 mt-0.5">${asofLabel(it.asof)} 기준</div>
+              <div class="truncate">${rank}<span class="font-extrabold text-white text-sm">${it.ticker}</span><span class="text-xs text-slate-400 ml-1.5">${it.name}</span></div>
+              <div class="text-[10px] text-slate-500 mt-0.5">${priceBasisLabel(it)}<span class="text-slate-600"> · </span>등락 ${currentPeriod}</div>
             </div>
             <div class="flex items-center justify-between sm:justify-end gap-2 sm:gap-3 shrink-0 w-full sm:w-auto">
               <span class="text-xs text-slate-300 whitespace-nowrap">${it.price}</span>
@@ -594,6 +682,7 @@
       drawerMode = null;
       renderCategories();
       document.getElementById('drawer-section').classList.add('hidden');
+      syncRadarBtn();
     }
 
     const RATIO_TONE = {
@@ -660,7 +749,7 @@
       document.getElementById('modal-name').textContent = `${it.ticker} — ${it.name}`;
       document.getElementById('modal-price').innerHTML =
         `현재가: ${it.price} · <span class="${dayCls}">오늘 ${fmtChg(it.chg1d)}</span> / <span class="${weekCls}">주간 ${fmtChg(it.chg1w)}</span>`
-        + `<br><span class="text-slate-500">${asofLabel(it.asof)} 기준 · 점수는 100점 만점 매수 매력도</span>`;
+        + `\n<span class="block text-slate-500">${priceBasisLabel(it)} · 점수는 100점 만점 매수 매력도</span>`;
       document.getElementById('modal-score').textContent = `${it.score}점`;
       document.getElementById('modal-score').className = `text-2xl font-extrabold ${sig.textCls}`;
       document.getElementById('modal-signal').textContent = sig.label;
@@ -703,11 +792,16 @@
 
     // 8초 타임아웃 + 1회 재시도. 둘 다 실패하면 '다시 불러오기' 안내를 보입니다.
     //   (예전에는 타임아웃이 없어 스켈레톤이 영원히 남을 수 있었습니다)
+    const DATA_STALE_MS = 15 * 60 * 1000;   // 탭을 되돌렸을 때 이 시간 넘게 지난 data.json 이면 다시 받습니다
+    let dataFetchedAt = null;               // data.json 을 마지막으로 성공해서 받은 시각
+    let dataReloading = false;
+
     async function loadData() {
       for (let attempt = 1; attempt <= 2; attempt++) {
         try {
           appData = await fetchDataOnce();
           dataState = 'ready';
+          dataFetchedAt = Date.now();
           renderAll();
           return true;
         } catch (e) {
@@ -716,6 +810,26 @@
       }
       renderLoadError();
       return false;
+    }
+
+    // 탭을 오래 열어 두었다가 돌아왔을 때: 받은 지 15분이 넘었으면 data.json 을 다시 받아
+    // 새 스냅샷이 올라왔는지 확인합니다. 실패하면 지금 화면·지금 스냅샷 시각을 그대로 둡니다.
+    async function reloadDataIfStale() {
+      if (document.hidden || dataReloading || dataState !== 'ready') return;
+      if (dataFetchedAt == null || Date.now() - dataFetchedAt < DATA_STALE_MS) return;
+      dataReloading = true;
+      try {
+        const json = await fetchDataOnce();
+        appData = json;
+        dataFetchedAt = Date.now();
+        renderAll();
+        if (drawerMode) renderDrawer();
+        if (modalTicker && !document.getElementById('score-modal').classList.contains('hidden')) renderModal(modalTicker);
+      } catch (e) {
+        /* 재로드 실패: 화면에 있던 값과 스냅샷 시각을 그대로 유지합니다 */
+      } finally {
+        dataReloading = false;
+      }
     }
 
     function retryLoad() {
@@ -841,7 +955,9 @@
 
     const FNG_URL = 'https://api.alternative.me/fng/?limit=1';
     let marketState = { kimchi: null, fng: null };
-    let marketRefreshedAt = null;
+    let marketRefreshedAt = null;      // 시장 온도계 fetch 가 마지막으로 '성공'한 시각 (둘 중 하나라도 받아왔을 때)
+    let kimchiRefreshedAt = null;      // 김프를 마지막으로 성공해서 받아온 시각
+    let fngRefreshedAt = null;         // 크립토 공탐을 마지막으로 성공해서 받아온 시각
     let marketTried = false;
     let marketTimer = null;
 
@@ -1026,8 +1142,8 @@
 
       renderLevelCard('kvol', m.kospiVol, {
         kind: 'kvol', min: 8, max: 50, digits: 1, market: '서울',
-        detail: o => (o.kospi != null ? '코스피 ' + Number(o.kospi).toLocaleString('ko-KR') + ' · 전일 ' + signedPct(o.chg1d) + '<br>' : '')
-          + '<span class="text-slate-500">VKOSPI 공식 지수는 무료 공개 API가 없어, 코스피 종가 20거래일 변동성(연율)으로 계산합니다.</span>'
+        detail: o => (o.kospi != null ? '코스피 ' + Number(o.kospi).toLocaleString('ko-KR') + ' · 전일 ' + signedPct(o.chg1d) : '')
+          + '\n<span class="block text-slate-500">VKOSPI 공식 지수는 무료 공개 API가 없어, 코스피 종가 20거래일 변동성(연율)으로 계산합니다.</span>'
       });
 
       const us = m.usFng || {};
@@ -1039,7 +1155,7 @@
         // 비율 자체보다 CNN이 1년 범위로 환산한 점수를 기준으로 등급을 보여 줍니다.
         levelFn: (o, raw) => (o.labelKo ? { label: o.labelKo, tone: fngTone(Number(o.score)) } : cnLevel('pc', raw)),
         detail: o => 'CNN 풋/콜 점수 ' + Number(o.score).toFixed(1) + '점 · 1.00을 넘으면 하락 베팅(풋)이 우세합니다.'
-          + '<br><span class="text-slate-500">풋옵션 비중이 커질수록 대중이 하락을 두려워한다는 뜻입니다.</span>'
+          + '\n<span class="block text-slate-500">풋옵션 비중이 커질수록 대중이 하락을 두려워한다는 뜻입니다.</span>'
       });
     }
 
@@ -1053,8 +1169,12 @@
         || (cache && cache.fng)
         || (dataMarket.cryptoFng && dataMarket.cryptoFng.value != null ? dataMarket.cryptoFng : null);
 
-      const stampLive = marketRefreshedAt ? '실시간 ' + hhmm(marketRefreshedAt) + ' KST' : '자동 갱신';
-      const stampCache = cache ? '저장값 ' + hhmm(cache.savedAt) + ' KST' : '자동 갱신';
+      // 실시간 배지는 '이 브라우저가 시세를 마지막으로 성공해서 받아온 시각'입니다. (스냅샷 시각과 별개)
+      const stampLive = kimchiRefreshedAt ? '김프 실시간 ' + hhmm(kimchiRefreshedAt) : '자동 갱신';
+      const stampCache = cache ? '김프 저장값 ' + hhmm(cache.savedAt) : '자동 갱신';
+      const stampFngLive = fngRefreshedAt ? '공탐 실시간 ' + hhmm(fngRefreshedAt) : '자동 갱신';
+      const stampFngCache = cache ? '공탐 저장값 ' + hhmm(cache.savedAt) : '자동 갱신';
+      const liveTitle = '이 브라우저가 김프·크립토 공탐 지수를 마지막으로 성공해서 다시 받아온 시각(KST)입니다. 위의 시세 스냅샷 시각과는 다른 값입니다.';
 
       // --- 김치 프리미엄 ---
       const kPct = document.getElementById('kimchi-pct');
@@ -1078,8 +1198,9 @@
           : (p < -0.2 ? '국내가가 해외보다 ' + Math.abs(p).toFixed(1) + '% 쌉니다.' : '국내·해외 가격이 사실상 같습니다.');
         kDetail.innerHTML = '업비트 ' + fmtWon(kimchi.upbitKrw) + ' · 해외 ' + fmtUsd(kimchi.overseasUsd)
           + (kimchi.usdSource ? ' (' + kimchi.usdSource + ')' : '') + ' · 환율 ' + Number(kimchi.usdKrw).toFixed(2) + '원'
-          + '<br>' + meaning;
-        kLive.textContent = marketState.kimchi ? stampLive : (cache && cache.kimchi ? stampCache : '자동 갱신');
+          + '\n<span class="block">' + meaning + '</span>';
+        kLive.textContent = kimchiRefreshedAt ? stampLive : (cache && cache.kimchi ? stampCache : '자동 갱신');
+        kLive.title = liveTitle;
       } else {
         kPct.textContent = '—';
         kPct.className = 'text-3xl font-extrabold leading-none text-slate-400';
@@ -1105,7 +1226,8 @@
         fBadge.textContent = tone.label;
         fBadge.className = 'text-[11px] font-extrabold px-2 py-0.5 mb-1 rounded-full border ml-auto ' + tone.cls;
         fMarker.style.left = Math.min(99, Math.max(1, v)) + '%';
-        fLive.textContent = marketState.fng ? stampLive : (cache && cache.fng ? stampCache : '자동 갱신');
+        fLive.textContent = fngRefreshedAt ? stampFngLive : (cache && cache.fng ? stampFngCache : '자동 갱신');
+        fLive.title = liveTitle;
       } else {
         fValue.textContent = '—';
         fValue.className = 'text-4xl font-extrabold leading-none text-slate-400';
@@ -1123,6 +1245,9 @@
         jsonWithTimeout(FNG_URL).catch(() => null)
       ]);
 
+      let gotKimchi = false;
+      let gotFng = false;
+
       if (upbit && overseas && fx) {
         const overseasKrw = overseas.value * fx.value;
         marketState.kimchi = {
@@ -1133,14 +1258,19 @@
           usdSource: overseas.name,
           fxSource: fx.name
         };
+        gotKimchi = true;
       }
 
       const row = fngRaw && fngRaw.data && fngRaw.data[0];
       if (row && row.value != null && isFinite(parseFloat(row.value))) {
         marketState.fng = { value: parseInt(row.value, 10), label: row.value_classification || '' };
+        gotFng = true;
       }
 
-      marketRefreshedAt = Date.now();
+      // '실시간' 시각은 실제로 새 값을 받아온 경우에만 갱신합니다 (실패한 fetch가 시각만 앞당기지 없게)
+      if (gotKimchi) kimchiRefreshedAt = Date.now();
+      if (gotFng) fngRefreshedAt = Date.now();
+      if (gotKimchi || gotFng) marketRefreshedAt = Date.now();
       marketTried = true;
       if (marketState.kimchi || marketState.fng) saveMarketCache();
       renderMarket();
@@ -1148,8 +1278,17 @@
 
     // 1분마다 자동 갱신 (탭이 다시 보일 때도 즉시 한 번)
     refreshMarket();
-    marketTimer = setInterval(() => { if (!document.hidden) refreshMarket(); }, 60000);
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshMarket(); });
+    marketTimer = setInterval(() => {
+      if (document.hidden) return;
+      refreshMarket();
+      renderSnapshotAge();   // 탭을 열어 둔 사이에도 'N시간 전' 배지가 사실과 어긋나지 않게
+    }, 60000);
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) return;
+      refreshMarket();
+      reloadDataIfStale();
+      renderSnapshotAge();
+    });
 
     // 첫 화면은 로딩 스켈레톤 → data.json 도착 후 실제 수치로 교체
     renderLoading();
