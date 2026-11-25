@@ -19,13 +19,81 @@
   <meta name="apple-mobile-web-app-title" content="SAYO" />
   <style>
     body { font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif; background-color: #0b0f19; color: #f1f5f9; }
-    .card-hover { transition: all 0.2s ease; }
-    .card-hover:hover { transform: translateY(-2px); border-color: #38bdf8; }
+    /* 카드 호버는 살짝 떠오르기만 — 테두리 빛은 #228 스포트라이트가 커서를 따라 그립니다 */
+    .card-hover { transition: transform .22s ease, -webkit-transform .22s ease; }
+    .card-hover:hover { transform: translateY(-2px); }
+    .card-hover:active { transform: translateY(0); }
     /* ⚡ 이상 징후 레이더 제목: 실제로 누를 수 있는 버튼임을 드러내는 스타일 */
     .radar-btn { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: #94a3b8; background: transparent; border: 0; padding: 2px 0; cursor: pointer; text-align: left; }
     .radar-btn:hover { color: #f1f5f9; }
     .radar-btn:focus-visible { outline: 2px solid #38bdf8; outline-offset: 3px; border-radius: 6px; }
     .radar-btn .radar-more { font-size: 11px; font-weight: 600; color: #38bdf8; white-space: nowrap; }
+
+    /* ─────────────────────────────────────────────────────────────
+       Lucian UI 요소 적용 — #039 · #228 · #098 · #154 + 모달/서랍/게이지 트랜지션
+       (색은 SAYO 다크 팔레트 토큰에 맞춰 두었습니다)
+       ───────────────────────────────────────────────────────────── */
+
+    /* #039 미끄러지는 알약 탭 */
+    .seg { position: relative; display: inline-flex; align-items: center; padding: 2px; border-radius: 10px; background: #1e293b; }
+    .seg-pill { position: absolute; top: 2px; left: 0; height: calc(100% - 4px); width: 0; border-radius: 8px;
+      background: #0ea5e9; box-shadow: 0 1px 8px rgba(14, 165, 233, .45);
+      transition: transform .34s cubic-bezier(.34, 1.16, .64, 1), width .34s cubic-bezier(.34, 1.16, .64, 1); }
+    .seg-btn { position: relative; z-index: 1; padding: 4px 10px; border-radius: 8px; font-size: 12px; font-weight: 700;
+      color: #94a3b8; white-space: nowrap; transition: color .3s ease; }
+    .seg-btn:hover { color: #e2e8f0; }
+    .seg-btn.is-active { color: #020617; }
+
+    /* #228 커서 빛이 번지는 카드 테두리 — 카드마다 자기 상자 기준 좌표(--cx·--cy)를 받아 한 점의 조명이 함께 비춥니다 */
+    .spot { position: relative; }
+    .spot::before { content: ""; position: absolute; inset: 0; padding: 1.5px; border-radius: inherit; pointer-events: none;
+      background: radial-gradient(240px circle at var(--cx, 50%) var(--cy, 50%), rgba(125, 211, 252, var(--o, 0)), rgba(56, 189, 248, calc(var(--o, 0) * .94)) 55%, rgba(129, 140, 248, calc(var(--o, 0) * .45)) 82%, rgba(129, 140, 248, 0) 100%);
+      -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+      mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); mask-composite: exclude; }
+    .spot::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+      background: radial-gradient(260px circle at var(--cx, 50%) var(--cy, 50%), rgba(56, 189, 248, calc(var(--o, 0) * .10)), transparent 70%); }
+
+    /* #098 자리마다 굴러가는 실시간 지표 — 숫자 폭이 흔들리지 않게 고정폭 숫자 */
+    [data-roll] { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
+
+    /* #154 역량을 포개는 다각형 — 4축 다이아몬드 레이더 */
+    .radar { display: block; width: 100%; height: 200px; overflow: visible; }
+    .radar text { font-family: inherit; font-size: 9.5px; font-weight: 700; fill: #94a3b8; }
+    .radar .radar-val { font-size: 10.5px; font-weight: 800; fill: #e2e8f0; }
+    .radar .radar-total { font-size: 21px; font-weight: 800; fill: #f8fafc; paint-order: stroke; stroke: rgba(11, 15, 25, .9); stroke-width: 3px; }
+    .radar .radar-total-label { font-size: 9px; font-weight: 700; fill: #cbd5e1; paint-order: stroke; stroke: rgba(11, 15, 25, .9); stroke-width: 3px; }
+    .radar .gridline { fill: none; stroke: #1e293b; stroke-width: 1; }
+    .radar .gridline.is-outer { stroke: #334155; }
+    .radar .axis { stroke: #1e293b; stroke-width: 1; }
+    .radar .ref { fill: none; stroke: #10b981; stroke-width: 1; stroke-dasharray: 3 4; opacity: .5; }
+    .radar .shape { fill: url(#radarFill); stroke: #38bdf8; stroke-width: 2; stroke-linejoin: round; filter: drop-shadow(0 0 6px rgba(56, 189, 248, .35)); }
+    .radar .dot { fill: #7dd3fc; stroke: #0b0f19; stroke-width: 1.6; opacity: 0; animation: radarDot .32s ease .34s forwards; }
+    @keyframes radarDot { to { opacity: 1; } }
+
+    /* 모달 트랜지션 — hidden 대신 is-open 으로 상태를 다룹니다 */
+    #score-modal { opacity: 0; visibility: hidden; pointer-events: none; overflow-y: auto; align-items: flex-start;
+      transition: opacity .24s ease, visibility 0s linear .24s; }
+    #score-modal.is-open { opacity: 1; visibility: visible; pointer-events: auto; transition: opacity .24s ease; }
+    #score-modal .modal-panel { margin: auto; transform: translateY(14px) scale(.975); opacity: 0;
+      transition: transform .34s cubic-bezier(.2, .8, .2, 1), opacity .26s ease; }
+    #score-modal.is-open .modal-panel { transform: none; opacity: 1; }
+
+    /* 서랍 트랜지션 — 열 때 높이를 재서 max-height 로 부드럽게 펼칩니다 */
+    #drawer-section { overflow: hidden;
+      transition: max-height .42s cubic-bezier(.2, .8, .2, 1), opacity .28s ease, transform .36s cubic-bezier(.2, .8, .2, 1); }
+    #drawer-section:not(.is-open) { opacity: 0; transform: translateY(-8px); }
+
+    /* 시소 게이지·구성지표·채점표 막대가 0에서 목표치로 차오릅니다 */
+    .ratio-fill { transition: width .62s cubic-bezier(.2, .8, .2, 1); }
+    .fill-bar { transition: width .6s cubic-bezier(.2, .8, .2, 1); }
+    .m-bar { transition: width .58s cubic-bezier(.2, .8, .2, 1); }
+
+    @media (prefers-reduced-motion: reduce) {
+      .seg-pill, .ratio-fill, .fill-bar, .m-bar,
+      #score-modal, #score-modal .modal-panel, #drawer-section {
+        transition-duration: .001ms !important; transition-delay: 0s !important; }
+      .radar .dot { animation-delay: 0s !important; animation-duration: .001ms !important; }
+    }
   </style>
 </head>
 <body class="min-h-screen pb-16">
@@ -58,7 +126,7 @@
   <main class="max-w-4xl mx-auto px-4 mt-5 space-y-6">
 
     <!-- 최상단: 오늘 가장 싼 자산 한 줄 요약 -->
-    <div class="bg-gradient-to-r from-emerald-950/60 to-slate-900 border border-emerald-500/30 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+    <div class="spot bg-gradient-to-r from-emerald-950/60 to-slate-900 border border-emerald-500/30 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
       <div class="flex items-center gap-2.5">
         <span class="text-lg">💡</span>
         <p id="top-summary" class="text-sm sm:text-base font-semibold text-slate-100">
@@ -71,15 +139,16 @@
     </div>
 
     <!-- 1단: 일간/주간 급락·급등 알약 티커 -->
-    <section class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4">
+    <section class="spot bg-slate-900/90 border border-slate-800 rounded-2xl p-4">
       <div class="flex items-center justify-between mb-3">
         <button type="button" id="movers-btn" onclick="openMoversDrawer()" aria-expanded="false" aria-controls="drawer-section" title="지금 고른 기간의 20종목 등락률 전체 순위를 엽니다" class="radar-btn">
           <span>⚡ 이상 징후 레이더</span>
           <span class="radar-more">전체 보기 ›</span>
         </button>
-        <div class="inline-flex bg-slate-800 rounded-lg p-0.5 text-xs">
-          <button id="btn-1d" onclick="setPeriod('1D')" class="px-2.5 py-1 rounded-md font-bold bg-sky-500 text-slate-950 whitespace-nowrap">오늘(1D)</button>
-          <button id="btn-1w" onclick="setPeriod('1W')" class="px-2.5 py-1 rounded-md font-semibold text-slate-400 whitespace-nowrap">이번 주(1W)</button>
+        <div class="seg" role="tablist" aria-label="등락률 기간 선택">
+          <span class="seg-pill" id="period-pill" aria-hidden="true"></span>
+          <button type="button" id="btn-1d" role="tab" aria-selected="true" onclick="setPeriod('1D')" class="seg-btn is-active">오늘(1D)</button>
+          <button type="button" id="btn-1w" role="tab" aria-selected="false" onclick="setPeriod('1W')" class="seg-btn">이번 주(1W)</button>
         </div>
       </div>
       <div class="flex flex-wrap items-center gap-2 text-xs" id="mover-pills"></div>
@@ -115,7 +184,7 @@
     </section>
 
     <!-- 4단: 상대 가성비 판독기 -->
-    <section class="bg-slate-900/70 border border-slate-800 rounded-2xl p-4">
+    <section class="spot bg-slate-900/70 border border-slate-800 rounded-2xl p-4">
       <div class="flex items-end justify-between gap-2 mb-3">
         <h2 class="text-sm font-bold text-slate-300">⚖️ 둘 중 뭐가 더 쌀까? (상대 가성비)</h2>
         <span class="text-[10px] text-slate-500 whitespace-nowrap">막대가 길수록 그쪽이 더 싸요</span>
@@ -135,13 +204,13 @@
       </div>
 
       <!-- 🇺🇸 미장 공포·탐욕 지수 (CNN) — 대표 카드 -->
-      <div class="bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 rounded-2xl p-4">
+      <div class="spot bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 rounded-2xl p-4">
         <div class="flex items-center justify-between gap-2">
           <span class="text-xs font-bold text-slate-400">🇺🇸 미장 공포·탐욕 지수 <span class="font-normal text-slate-500">(CNN)</span></span>
           <span id="us-fng-live" class="text-[10px] text-slate-500 bg-slate-800 px-2 py-0.5 rounded-full whitespace-nowrap">불러오는 중…</span>
         </div>
         <div class="flex items-end gap-1.5 mt-1.5">
-          <span id="us-fng-value" class="text-4xl font-extrabold leading-none text-slate-400">—</span>
+          <span id="us-fng-value" data-roll class="text-4xl font-extrabold leading-none text-slate-400">—</span>
           <span class="text-[11px] text-slate-500 mb-1.5">/ 100</span>
           <span id="us-fng-badge" class="text-[11px] font-extrabold px-2 py-0.5 mb-1 rounded-full border border-slate-700 text-slate-400 ml-auto">—</span>
         </div>
@@ -155,13 +224,13 @@
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
 
         <!-- 😱 크립토 공포·탐욕 지수 -->
-        <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4">
+        <div class="spot bg-slate-900/90 border border-slate-800 rounded-2xl p-4">
           <div class="flex items-center justify-between gap-2">
             <span class="text-xs font-bold text-slate-400">😱 크립토 공포·탐욕 지수</span>
             <span id="fng-live" class="text-[10px] text-slate-500 bg-slate-800 px-2 py-0.5 rounded-full whitespace-nowrap">불러오는 중…</span>
           </div>
           <div class="flex items-end gap-1.5 mt-1.5">
-            <span id="fng-value" class="text-4xl font-extrabold leading-none text-slate-400">—</span>
+            <span id="fng-value" data-roll class="text-4xl font-extrabold leading-none text-slate-400">—</span>
             <span class="text-[11px] text-slate-500 mb-1.5">/ 100</span>
             <span id="fng-badge" class="text-[11px] font-extrabold px-2 py-0.5 mb-1 rounded-full border border-slate-700 text-slate-400 ml-auto">—</span>
           </div>
@@ -172,13 +241,13 @@
         </div>
 
         <!-- 🧭 김치 프리미엄 (BTC) -->
-        <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4">
+        <div class="spot bg-slate-900/90 border border-slate-800 rounded-2xl p-4">
           <div class="flex items-center justify-between gap-2">
             <span class="text-xs font-bold text-slate-400">🧭 김치 프리미엄 <span class="font-normal text-slate-500">(BTC)</span></span>
             <span id="kimchi-live" class="text-[10px] text-slate-500 bg-slate-800 px-2 py-0.5 rounded-full whitespace-nowrap">불러오는 중…</span>
           </div>
           <div class="flex items-end gap-2 mt-1.5">
-            <span id="kimchi-pct" class="text-3xl font-extrabold leading-none text-slate-400">—</span>
+            <span id="kimchi-pct" data-roll class="text-3xl font-extrabold leading-none text-slate-400">—</span>
             <span id="kimchi-badge" class="text-[11px] font-extrabold px-2 py-0.5 mb-0.5 rounded-full border border-slate-700 text-slate-400">—</span>
           </div>
           <div class="relative h-2.5 rounded-full bg-slate-800 mt-3">
@@ -190,13 +259,13 @@
         </div>
 
         <!-- 📉 미장 변동성 (VIX) -->
-        <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4">
+        <div class="spot bg-slate-900/90 border border-slate-800 rounded-2xl p-4">
           <div class="flex items-center justify-between gap-2">
             <span class="text-xs font-bold text-slate-400">📉 미장 변동성 <span class="font-normal text-slate-500">(VIX)</span></span>
             <span id="vix-live" class="text-[10px] text-slate-500 bg-slate-800 px-2 py-0.5 rounded-full whitespace-nowrap">자동 갱신</span>
           </div>
           <div class="flex items-end gap-1.5 mt-1.5">
-            <span id="vix-value" class="text-3xl font-extrabold leading-none text-slate-400">—</span>
+            <span id="vix-value" data-roll class="text-3xl font-extrabold leading-none text-slate-400">—</span>
             <span class="text-[11px] text-slate-500 mb-1">pt</span>
             <span id="vix-badge" class="text-[11px] font-extrabold px-2 py-0.5 mb-0.5 rounded-full border border-slate-700 text-slate-400 ml-auto">—</span>
           </div>
@@ -208,13 +277,13 @@
         </div>
 
         <!-- 🏦 채권 변동성 (MOVE) -->
-        <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4">
+        <div class="spot bg-slate-900/90 border border-slate-800 rounded-2xl p-4">
           <div class="flex items-center justify-between gap-2">
             <span class="text-xs font-bold text-slate-400">🏦 채권 변동성 <span class="font-normal text-slate-500">(MOVE)</span></span>
             <span id="move-live" class="text-[10px] text-slate-500 bg-slate-800 px-2 py-0.5 rounded-full whitespace-nowrap">자동 갱신</span>
           </div>
           <div class="flex items-end gap-1.5 mt-1.5">
-            <span id="move-value" class="text-3xl font-extrabold leading-none text-slate-400">—</span>
+            <span id="move-value" data-roll class="text-3xl font-extrabold leading-none text-slate-400">—</span>
             <span class="text-[11px] text-slate-500 mb-1">pt</span>
             <span id="move-badge" class="text-[11px] font-extrabold px-2 py-0.5 mb-0.5 rounded-full border border-slate-700 text-slate-400 ml-auto">—</span>
           </div>
@@ -226,13 +295,13 @@
         </div>
 
         <!-- 🇰🇷 국장 변동성 (코스피 20일 실현변동성) -->
-        <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4">
+        <div class="spot bg-slate-900/90 border border-slate-800 rounded-2xl p-4">
           <div class="flex items-center justify-between gap-2">
             <span class="text-xs font-bold text-slate-400">🇰🇷 국장 변동성 <span class="font-normal text-slate-500">(코스피)</span></span>
             <span id="kvol-live" class="text-[10px] text-slate-500 bg-slate-800 px-2 py-0.5 rounded-full whitespace-nowrap">자동 갱신</span>
           </div>
           <div class="flex items-end gap-1.5 mt-1.5">
-            <span id="kvol-value" class="text-3xl font-extrabold leading-none text-slate-400">—</span>
+            <span id="kvol-value" data-roll class="text-3xl font-extrabold leading-none text-slate-400">—</span>
             <span class="text-[11px] text-slate-500 mb-1">%</span>
             <span id="kvol-badge" class="text-[11px] font-extrabold px-2 py-0.5 mb-0.5 rounded-full border border-slate-700 text-slate-400 ml-auto">—</span>
           </div>
@@ -244,13 +313,13 @@
         </div>
 
         <!-- 📊 풋/콜 옵션 심리 -->
-        <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4">
+        <div class="spot bg-slate-900/90 border border-slate-800 rounded-2xl p-4">
           <div class="flex items-center justify-between gap-2">
             <span class="text-xs font-bold text-slate-400">📊 풋/콜 비율 <span class="font-normal text-slate-500">(미장 옵션)</span></span>
             <span id="pc-live" class="text-[10px] text-slate-500 bg-slate-800 px-2 py-0.5 rounded-full whitespace-nowrap">자동 갱신</span>
           </div>
           <div class="flex items-end gap-1.5 mt-1.5">
-            <span id="pc-value" class="text-3xl font-extrabold leading-none text-slate-400">—</span>
+            <span id="pc-value" data-roll class="text-3xl font-extrabold leading-none text-slate-400">—</span>
             <span class="text-[11px] text-slate-500 mb-1">배</span>
             <span id="pc-badge" class="text-[11px] font-extrabold px-2 py-0.5 mb-0.5 rounded-full border border-slate-700 text-slate-400 ml-auto">—</span>
           </div>
@@ -278,8 +347,8 @@
   </footer>
 
   <!-- 상세 100점 채점표 모달 팝업 -->
-  <div id="score-modal" onclick="if(event.target===this)closeModal()" class="hidden fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-md w-full p-5 shadow-2xl space-y-4">
+  <div id="score-modal" onclick="if(event.target===this)closeModal()" aria-hidden="true" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="modal-panel bg-slate-900 border border-slate-700 rounded-2xl max-w-md w-full p-5 shadow-2xl space-y-4">
       <div class="flex items-start justify-between">
         <div>
           <span id="modal-cat" class="text-xs font-semibold text-sky-400"></span>
@@ -290,30 +359,39 @@
       </div>
 
       <div id="modal-badge-box" class="p-3 rounded-xl border flex items-center justify-between">
-        <span id="modal-score" class="text-2xl font-extrabold"></span>
+        <span id="modal-score" data-roll class="text-2xl font-extrabold"></span>
         <span id="modal-signal" class="text-xs font-extrabold px-3 py-1 rounded-full"></span>
       </div>
 
       <p id="modal-comment" class="text-xs text-slate-300 bg-slate-800/70 p-3 rounded-xl leading-relaxed"></p>
       <p class="text-[10px] text-slate-500">신호등 기준: <span class="text-emerald-400 font-bold">80점↑ 지금 사요</span> · <span class="text-amber-400 font-bold">40~79점 나눠 사요</span> · <span class="text-rose-400 font-bold">40점 미만 참아 봐요</span></p>
 
+      <!-- 154 4축 다이아몬드 레이더: 4개 지표를 비율(%)로 한눈에 -->
+      <div>
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-xs font-bold text-slate-300">🎯 한눈에 보는 4개 지표</span>
+          <span class="text-[10px] text-slate-500"><svg width="14" height="4" viewBox="0 0 14 4" style="vertical-align:1px" aria-hidden="true"><line x1="0" y1="2" x2="14" y2="2" stroke="#34d399" stroke-width="1.5" stroke-dasharray="3 3" /></svg> 80% = 지금 사요 기준</span>
+        </div>
+        <svg id="m-radar" class="radar" viewBox="0 0 300 200" role="img" aria-label="4개 지표를 비율로 보여 주는 다이아몬드 레이더 차트"></svg>
+      </div>
+
       <div class="space-y-2.5 text-xs">
         <div class="font-bold text-slate-300">📊 100점 만점 팩트 채점표</div>
         <div>
           <div class="flex justify-between mb-1"><span>1. 200일 장기 평균선 위치</span><span id="m-s1" class="font-bold"></span></div>
-          <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden"><div id="m-b1" class="bg-sky-400 h-full"></div></div>
+          <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden"><div id="m-b1" class="m-bar bg-sky-400 h-full" style="width:0"></div></div>
         </div>
         <div>
           <div class="flex justify-between mb-1"><span>2. 고점 대비 할인율 & RSI</span><span id="m-s2" class="font-bold"></span></div>
-          <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden"><div id="m-b2" class="bg-emerald-400 h-full"></div></div>
+          <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden"><div id="m-b2" class="m-bar bg-emerald-400 h-full" style="width:0"></div></div>
         </div>
         <div>
           <div class="flex justify-between mb-1"><span>3. 1년 박스권 위치</span><span id="m-s3" class="font-bold"></span></div>
-          <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden"><div id="m-b3" class="bg-indigo-400 h-full"></div></div>
+          <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden"><div id="m-b3" class="m-bar bg-indigo-400 h-full" style="width:0"></div></div>
         </div>
         <div>
           <div class="flex justify-between mb-1"><span id="m-s4-label">4. 공포 심리 (자산군별)</span><span id="m-s4" class="font-bold"></span></div>
-          <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden"><div id="m-b4" class="bg-amber-400 h-full"></div></div>
+          <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden"><div id="m-b4" class="m-bar bg-amber-400 h-full" style="width:0"></div></div>
           <p id="m-s4-basis" class="text-[10px] text-slate-500 mt-1"></p>
         </div>
       </div>
@@ -347,6 +425,75 @@
       const el = document.getElementById(id);
       if (el) el.textContent = text;
     }
+
+    // ─────────────────────────────────────────────────────────────
+    // Lucian 공통 도우미 — 움직임 줄이기 설정을 모든 모션에서 존중합니다
+    // ─────────────────────────────────────────────────────────────
+    function prefersReducedMotion() {
+      try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; }
+    }
+
+    // #098 자리마다 굴러가는 실시간 지표
+    //   이전 값에서 목표 값까지 ease-out 으로 차오릅니다. 첫 렌더는 0 에서 시작합니다.
+    function rollNumber(el, to, opts) {
+      if (!el) return;
+      const target = Number(to);
+      if (!isFinite(target)) return;
+      const o = opts || {};
+      const fmt = o.format || function (v) { return String(Math.round(v)); };
+      const from = (typeof o.from === 'number' && isFinite(o.from)) ? o.from : (el._rollValue != null ? el._rollValue : 0);
+      el._rollValue = target;
+      if (el._rollRaf) { cancelAnimationFrame(el._rollRaf); el._rollRaf = 0; }
+      const dur = prefersReducedMotion() ? 0 : (o.duration || 640);
+      if (!dur || Math.abs(target - from) < 1e-9) { el.textContent = fmt(target); return; }
+      const start = performance.now();
+      function tick(now) {
+        const t = Math.min(1, (now - start) / dur);
+        const e = 1 - Math.pow(1 - t, 3);
+        el.textContent = fmt(from + (target - from) * e);
+        if (t < 1) el._rollRaf = requestAnimationFrame(tick);
+        else { el.textContent = fmt(target); el._rollRaf = 0; }
+      }
+      el._rollRaf = requestAnimationFrame(tick);
+    }
+
+    // #228 커서 빛이 번지는 카드 테두리 — 문서 전체 커서 위치를 카드마다 상자 기준 좌표론 변환
+    const spot = { x: -500, y: -500, o: 0, target: 0, raf: 0, last: 0, movedAt: 0 };
+    function spotPaint() {
+      const cards = document.querySelectorAll('.spot');
+      for (let i = 0; i < cards.length; i++) {
+        const el = cards[i];
+        const r = el.getBoundingClientRect();
+        if (r.width === 0 || r.bottom < -80 || r.top > window.innerHeight + 80) continue;
+        el.style.setProperty('--cx', (spot.x - r.left).toFixed(1) + 'px');
+        el.style.setProperty('--cy', (spot.y - r.top).toFixed(1) + 'px');
+        el.style.setProperty('--o', spot.o.toFixed(3));
+      }
+    }
+    function spotFrame(now) {
+      spot.raf = 0;
+      const dt = Math.min(0.05, Math.max(0, (now - spot.last) / 1000));
+      spot.last = now;
+      const rate = spot.target ? 9 : 2.6;
+      spot.o += (spot.target - spot.o) * (prefersReducedMotion() ? 1 : Math.min(1, dt * rate));
+      spotPaint();
+      if (Math.abs(spot.target - spot.o) > 0.004 || (now - spot.movedAt) < 140) spot.raf = requestAnimationFrame(spotFrame);
+    }
+    function spotKick() {
+      if (spot.raf) return;
+      spot.last = performance.now();
+      spot.raf = requestAnimationFrame(spotFrame);
+    }
+    document.addEventListener('pointermove', function (e) {
+      if (e.pointerType && e.pointerType !== 'mouse' && e.pointerType !== 'pen') return;
+      spot.x = e.clientX;
+      spot.y = e.clientY;
+      spot.target = 1;
+      spot.movedAt = performance.now();
+      spotKick();
+    }, { passive: true });
+    document.addEventListener('pointerleave', function () { spot.target = 0; spotKick(); });
+    window.addEventListener('blur', function () { spot.target = 0; spotKick(); });
 
     // 로딩 중 스켈레톤 (실제 시세처럼 보이는 숫자는 하나도 없음)
     function renderLoading() {
@@ -506,14 +653,29 @@
       renderLevelCards();
     }
 
+    // #039 알약 인디케이터를 선택된 탭 자리로 미끄러뜨립니다
+    function movePeriodPill() {
+      const pill = document.getElementById('period-pill');
+      const active = document.getElementById(currentPeriod === '1D' ? 'btn-1d' : 'btn-1w');
+      if (!pill || !active || !active.offsetWidth) return;
+      pill.style.width = active.offsetWidth + 'px';
+      pill.style.transform = 'translateX(' + active.offsetLeft + 'px)';
+    }
+
     function setPeriod(p) {
       currentPeriod = p;
-      document.getElementById('btn-1d').className = p === '1D' ? "px-2.5 py-1 rounded-md font-bold bg-sky-500 text-slate-950 whitespace-nowrap" : "px-2.5 py-1 rounded-md font-semibold text-slate-400 whitespace-nowrap";
-      document.getElementById('btn-1w').className = p === '1W' ? "px-2.5 py-1 rounded-md font-bold bg-sky-500 text-slate-950 whitespace-nowrap" : "px-2.5 py-1 rounded-md font-semibold text-slate-400 whitespace-nowrap";
+      const isDay = p === '1D';
+      [['btn-1d', isDay], ['btn-1w', !isDay]].forEach(function (pair) {
+        const b = document.getElementById(pair[0]);
+        if (!b) return;
+        b.classList.toggle('is-active', pair[1]);
+        b.setAttribute('aria-selected', pair[1] ? 'true' : 'false');
+      });
+      movePeriodPill();
       renderMovers();
       // 열려 있는 서랍·모달도 같은 기간으로 다시 그립니다 (반쪽 토글 방지)
       renderDrawer();
-      if (modalTicker && !document.getElementById('score-modal').classList.contains('hidden')) renderModal(modalTicker);
+      if (modalTicker && isModalOpen()) renderModal(modalTicker);
     }
 
     function renderMovers() {
@@ -537,6 +699,8 @@
       document.getElementById('mover-pills').innerHTML = html;
     }
 
+    const scoreMemo = new Map();   // 카드가 다시 그려져도 점수가 0부터 다시 돌지 않도록 이전 값을 기억
+
     function renderCategories() {
       if (!appData) return;
       const grid = document.getElementById('category-grid');
@@ -548,9 +712,9 @@
         const greens = cat.items.filter(i => i.score >= GREEN_MIN).length;
         const activeBorder = selectedCatId === cat.id ? 'border-sky-400 ring-2 ring-sky-400/30' : 'border-slate-800';
         html += `
-          <button onclick="openCategory('${cat.id}')" class="card-hover bg-slate-900 border ${activeBorder} rounded-2xl p-4 text-left flex flex-col justify-between h-32">
+          <button onclick="openCategory('${cat.id}')" class="spot card-hover bg-slate-900 border ${activeBorder} rounded-2xl p-4 text-left flex flex-col justify-between h-32">
             <div class="text-sm font-bold text-slate-200">${cat.icon} ${cat.name}${greensOnly ? ` <span class="text-[10px] font-bold text-emerald-400" title="이 카테고리의 80점 이상(지금 사요) 종목 ${greens}개">🟢 ${greens}종목</span>` : ''}</div>
-            <div class="text-3xl font-extrabold ${sig.textCls} my-1">${avgScore}<span class="text-sm font-normal text-slate-400">점</span><span class="text-[10px] font-normal text-slate-500 ml-1">평균</span></div>
+            <div class="text-3xl font-extrabold ${sig.textCls} my-1"><span class="cat-score" data-roll data-cat="${cat.id}" data-score="${avgScore}">0</span><span class="text-sm font-normal text-slate-400">점</span><span class="text-[10px] font-normal text-slate-500 ml-1">평균</span></div>
             <div><span class="text-xs font-extrabold px-2.5 py-1 rounded-full border ${sig.cls}">${sig.label}</span></div>
           </button>
         `;
@@ -559,6 +723,14 @@
         html = `<div class="col-span-2 sm:col-span-3 bg-slate-900 border border-slate-800 rounded-2xl p-6 text-center text-xs text-slate-400">지금은 80점 이상인 자산이 없습니다. 전체 보기로 돌아가 점수를 확인해 보세요.</div>`;
       }
       grid.innerHTML = html;
+
+      // 카드 점수 롤링 (첫 렌더는 0 → 실제 점수, 이후 재렌더는 이전 값 → 새 값)
+      grid.querySelectorAll('.cat-score').forEach(el => {
+        const to = Number(el.dataset.score);
+        const from = scoreMemo.has(el.dataset.cat) ? scoreMemo.get(el.dataset.cat) : 0;
+        scoreMemo.set(el.dataset.cat, to);
+        rollNumber(el, to, { from: from });
+      });
 
       // 필터가 실제로 걸렸는지 한 줄로 보여 줍니다
       const status = document.getElementById('filter-status');
@@ -581,7 +753,7 @@
       const cat = appData.categories.find(c => c.id === catId);
       if (!cat) return;
       renderDrawer();
-      document.getElementById('drawer-section').classList.remove('hidden');
+      setDrawerOpen(true);
       document.getElementById('drawer-section').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       syncRadarBtn();
     }
@@ -593,16 +765,51 @@
       drawerMode = { kind: 'movers' };
       renderCategories();
       renderDrawer();
-      document.getElementById('drawer-section').classList.remove('hidden');
+      setDrawerOpen(true);
       document.getElementById('drawer-section').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       syncRadarBtn();
+    }
+
+    // 서랍 열람 상태 (열림/닫힘 트랜지션 + 화면 .hidden 유지)
+    let drawerOpen = false;
+    function setDrawerOpen(open) {
+      const el = document.getElementById('drawer-section');
+      if (!el) return;
+      drawerOpen = !!open;
+      clearTimeout(el._drawerTimer);
+      if (open) {
+        if (!el.classList.contains('hidden') && el.classList.contains('is-open')) return;   // 이미 열려 있음
+        el.classList.remove('hidden');
+        const target = el.scrollHeight;
+        el.style.maxHeight = '0px';
+        requestAnimationFrame(function () {
+          el.classList.add('is-open');
+          requestAnimationFrame(function () { el.style.maxHeight = target + 'px'; });
+        });
+        el._drawerTimer = setTimeout(function () { el.style.maxHeight = 'none'; }, 520);
+      } else {
+        if (!el.classList.contains('is-open')) {
+          el.classList.add('hidden');
+          el.style.maxHeight = '';
+          return;
+        }
+        el.style.maxHeight = el.scrollHeight + 'px';
+        requestAnimationFrame(function () {
+          el.classList.remove('is-open');
+          el.style.maxHeight = '0px';
+        });
+        el._drawerTimer = setTimeout(function () {
+          el.classList.add('hidden');
+          el.style.maxHeight = '';
+        }, 460);
+      }
     }
 
     // 레이더 버튼의 aria-expanded 를 현재 서랍 상태와 맞춥니다
     function syncRadarBtn() {
       const btn = document.getElementById('movers-btn');
       if (!btn) return;
-      const open = !!(drawerMode && drawerMode.kind === 'movers' && !document.getElementById('drawer-section').classList.contains('hidden'));
+      const open = !!(drawerMode && drawerMode.kind === 'movers' && drawerOpen);
       btn.setAttribute('aria-expanded', open ? 'true' : 'false');
     }
 
@@ -623,11 +830,11 @@
       if (greensOnly) {
         drawerMode = { kind: 'greens' };
         renderDrawer();
-        document.getElementById('drawer-section').classList.remove('hidden');
+        setDrawerOpen(true);
         document.getElementById('drawer-section').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       } else {
         drawerMode = null;
-        document.getElementById('drawer-section').classList.add('hidden');
+        setDrawerOpen(false);
       }
       syncRadarBtn();
     }
@@ -694,7 +901,7 @@
       selectedCatId = null;
       drawerMode = null;
       renderCategories();
-      document.getElementById('drawer-section').classList.add('hidden');
+      setDrawerOpen(false);
       syncRadarBtn();
     }
 
@@ -726,9 +933,8 @@
         const leftWins = r.winnerSide === 'left';
         // 중앙(50%)에서 우세 쪽으로 얼마나 쏠리는지: 우위 강도만큼 반쪽 트랙을 채움
         const fill = Math.max(4, ((pct - 50) / 45) * 50).toFixed(1);
-        const barStyle = (leftWins ? 'right:50%' : 'left:50%') + '; width:' + fill + '%';
         return `
-          <div class="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3">
+          <div class="spot bg-slate-950/60 border border-slate-800/80 rounded-xl p-3">
             <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 mb-2">
               <span class="text-[11px] font-bold truncate ${leftWins ? tone.text : 'text-slate-500'}">${r.left}</span>
               <span class="text-[10px] font-extrabold px-1.5 py-0.5 rounded-full border whitespace-nowrap ${tone.badge}">${r.winner}</span>
@@ -736,18 +942,128 @@
             </div>
             <div class="relative h-2.5 rounded-full bg-slate-800/90 overflow-hidden">
               <div class="absolute inset-y-0 left-1/2 w-px bg-slate-600"></div>
-              <div class="absolute inset-y-0 rounded-full ${tone.bar} transition-all duration-500" style="${barStyle}"></div>
+              <div class="absolute inset-y-0 rounded-full ${tone.bar} ratio-fill" data-fill="${fill}" style="${leftWins ? 'right:50%' : 'left:50%'};width:0%"></div>
             </div>
             <p class="text-[11px] text-slate-400 mt-1.5 leading-snug">${r.desc}</p>
           </div>
         `;
       }).join('');
+
+      // 시소 게이지 막대를 중앙(0)에서 우세 폭으로 차오르게 — 카드마다 살짝 시차를 둡니다
+      list.querySelectorAll('.ratio-fill').forEach(function (el, i) {
+        el.style.transitionDelay = (i * 45) + 'ms';
+        requestAnimationFrame(function () { el.style.width = el.dataset.fill + '%'; });
+      });
+    }
+
+    function isModalOpen() {
+      const el = document.getElementById('score-modal');
+      return !!el && el.classList.contains('is-open');
     }
 
     function openModal(ticker) {
       modalTicker = ticker;
+      const el = document.getElementById('score-modal');
+      el.classList.add('is-open');
+      el.setAttribute('aria-hidden', 'false');
+      el.scrollTop = 0;
       renderModal(ticker);
-      document.getElementById('score-modal').classList.remove('hidden');
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // #154 역량을 포개는 다각형 — 4축(200일선·고점할인·RSI·1년박스·공포심리) 다이아몬드 레이더
+    //   값은 각 지표의 배점 대비 비율(%), 점선 다이아몬드는 80% 기준선입니다.
+    // ─────────────────────────────────────────────────────────────
+    const RADAR_AXES = [
+      { key: 's1', max: 35, name: '200일선' },
+      { key: 's2', max: 30, name: '고점할인·RSI' },
+      { key: 's3', max: 20, name: '1년 박스' },
+      { key: 's4', max: 15, name: '공포심리' }
+    ];
+    const RADAR = { cx: 150, cy: 92, r: 64 };
+
+    function radarXY(i, v) {
+      const a = -Math.PI / 2 + i * (Math.PI / 2);
+      return [RADAR.cx + Math.cos(a) * RADAR.r * v, RADAR.cy + Math.sin(a) * RADAR.r * v];
+    }
+
+    function radarPoints(vals) {
+      return vals.map(function (v, i) {
+        return radarXY(i, v).map(function (n) { return n.toFixed(1); }).join(',');
+      }).join(' ');
+    }
+
+    function radarTexts(vals, total) {
+      const L = [
+        { x: RADAR.cx, y: 16, anchor: 'middle', vy: 28 },
+        { x: 214, y: 88, anchor: 'start', vy: 100 },
+        { x: RADAR.cx, y: 168, anchor: 'middle', vy: 181 },
+        { x: 86, y: 88, anchor: 'end', vy: 100 }
+      ];
+      let out = '';
+      L.forEach(function (l, i) {
+        out += '<text x="' + l.x + '" y="' + l.y + '" text-anchor="' + l.anchor + '">' + RADAR_AXES[i].name + '</text>';
+        out += '<text class="radar-val" x="' + l.x + '" y="' + l.vy + '" text-anchor="' + l.anchor + '">'
+          + Math.round(vals[i] * 100) + '%</text>';
+      });
+      out += '<text class="radar-total" x="' + RADAR.cx + '" y="' + (RADAR.cy + 1) + '" text-anchor="middle">' + Math.round(total) + '</text>';
+      out += '<text class="radar-total-label" x="' + RADAR.cx + '" y="' + (RADAR.cy + 14) + '" text-anchor="middle">총점</text>';
+      return out;
+    }
+
+    // 다각형 꼭짓점을 현재 좌표에서 목표 좌표로 ease-out 보간 (#154 의 morph 방식)
+    function morphRadar(shape, vals, dur) {
+      if (!shape) return;
+      if (shape._af) { cancelAnimationFrame(shape._af); shape._af = 0; }
+      const to = vals.map(function (v, i) { return radarXY(i, v); });
+      const prev = (shape.getAttribute('points') || '').trim().split(/\s+/).map(function (p) {
+        return p.split(',').map(Number);
+      });
+      const from = (prev.length === 4 && prev[0].length === 2) ? prev : vals.map(function () { return [RADAR.cx, RADAR.cy]; });
+      const ms = prefersReducedMotion() ? 0 : (dur || 480);
+      const t0 = performance.now();
+      function tick(now) {
+        let t = ms ? Math.min(1, (now - t0) / ms) : 1;
+        t = 1 - Math.pow(1 - t, 3);
+        shape.setAttribute('points', to.map(function (p, i) {
+          return p.map(function (n, j) { return (from[i][j] + (n - from[i][j]) * t).toFixed(1); }).join(',');
+        }).join(' '));
+        if (t < 1) shape._af = requestAnimationFrame(tick);
+        else shape._af = 0;
+      }
+      tick(t0);
+    }
+
+    function drawRadar(it) {
+      const svg = document.getElementById('m-radar');
+      if (!svg) return;
+      const vals = RADAR_AXES.map(function (ax) {
+        const v = Number(it[ax.key]);
+        return isFinite(v) ? Math.max(0, Math.min(1, v / ax.max)) : 0;
+      });
+      let frame = '';
+      [0.25, 0.5, 0.75, 1].forEach(function (v) {
+        frame += '<polygon class="gridline' + (v === 1 ? ' is-outer' : '') + '" points="' + radarPoints([v, v, v, v]) + '" />';
+      });
+      [0, 1, 2, 3].forEach(function (i) {
+        const p = radarXY(i, 1);
+        frame += '<line class="axis" x1="' + RADAR.cx + '" y1="' + RADAR.cy + '" x2="' + p[0].toFixed(1) + '" y2="' + p[1].toFixed(1) + '" />';
+      });
+      const dots = vals.map(function (v, i) {
+        const p = radarXY(i, v);
+        return '<circle class="dot" cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="2.6" />';
+      }).join('');
+      svg.innerHTML =
+        '<defs><linearGradient id="radarFill" x1="0" y1="0" x2="0" y2="1">' +
+        '<stop offset="0%" stop-color="#38bdf8" stop-opacity=".42" />' +
+        '<stop offset="100%" stop-color="#6366f1" stop-opacity=".16" />' +
+        '</linearGradient></defs>' +
+        frame +
+        '<polygon class="ref" points="' + radarPoints([0.8, 0.8, 0.8, 0.8]) + '" />' +
+        '<polygon class="shape" id="m-radar-shape" points="' + radarPoints([0, 0, 0, 0]) + '" />' +
+        '<g>' + dots + '</g>' +
+        radarTexts(vals, it.score);
+      morphRadar(document.getElementById('m-radar-shape'), vals);
     }
 
     // 모달도 currentPeriod 를 반영합니다 (선택한 기간을 진하게 표시)
@@ -763,27 +1079,36 @@
       document.getElementById('modal-price').innerHTML =
         `현재가: ${it.price} · <span class="${dayCls}">오늘 ${fmtChg(it.chg1d)}</span> / <span class="${weekCls}">주간 ${fmtChg(it.chg1w)}</span>`
         + `\n<span class="block text-slate-500">${priceBasisLabel(it)} · 점수는 100점 만점 매수 매력도</span>`;
-      document.getElementById('modal-score').textContent = `${it.score}점`;
       document.getElementById('modal-score').className = `text-2xl font-extrabold ${sig.textCls}`;
+      rollNumber(document.getElementById('modal-score'), it.score, { format: v => Math.round(v) + '점' });
       document.getElementById('modal-signal').textContent = sig.label;
       document.getElementById('modal-signal').className = `text-xs font-extrabold px-3 py-1 rounded-full border ${sig.cls}`;
       document.getElementById('modal-badge-box').className = `p-3 rounded-xl border flex items-center justify-between bg-slate-950 border-slate-800`;
       document.getElementById('modal-comment').textContent = it.comment;
 
       document.getElementById('m-s1').textContent = `${it.s1} / 35점`;
-      document.getElementById('m-b1').style.width = `${(it.s1/35)*100}%`;
       document.getElementById('m-s2').textContent = `${it.s2} / 30점`;
-      document.getElementById('m-b2').style.width = `${(it.s2/30)*100}%`;
       document.getElementById('m-s3').textContent = `${it.s3} / 20점`;
-      document.getElementById('m-b3').style.width = `${(it.s3/20)*100}%`;
       document.getElementById('m-s4-label').textContent = `4. 공포 심리 — ${it.s4Label || '자산군별 기준'}`;
       document.getElementById('m-s4').textContent = `${it.s4} / 15점`;
-      document.getElementById('m-b4').style.width = `${(it.s4/15)*100}%`;
       document.getElementById('m-s4-basis').textContent = it.s4Basis || '자산군에 맞는 공포 지표로 계산합니다.';
+
+      // #154 레이더 다각형 + 채점표 막대가 차오르기
+      drawRadar(it);
+      const bars = [['m-b1', it.s1 / 35], ['m-b2', it.s2 / 30], ['m-b3', it.s3 / 20], ['m-b4', it.s4 / 15]];
+      bars.forEach((b, i) => {
+        const el = document.getElementById(b[0]);
+        if (!el) return;
+        const w = Math.max(0, Math.min(100, b[1] * 100));
+        el.style.transitionDelay = (i * 40) + 'ms';
+        requestAnimationFrame(() => { el.style.width = w + '%'; });
+      });
     }
 
     function closeModal() {
-      document.getElementById('score-modal').classList.add('hidden');
+      const el = document.getElementById('score-modal');
+      el.classList.remove('is-open');
+      el.setAttribute('aria-hidden', 'true');
       modalTicker = null;
     }
 
@@ -839,7 +1164,7 @@
         dataFetchedAt = Date.now();
         renderAll();
         if (drawerMode) renderDrawer();
-        if (modalTicker && !document.getElementById('score-modal').classList.contains('hidden')) renderModal(modalTicker);
+        if (modalTicker && isModalOpen()) renderModal(modalTicker);
       } catch (e) {
         /* 재로드 실패: 화면에 있던 값과 스냅샷 시각을 그대로 유지합니다 */
       } finally {
@@ -1092,8 +1417,8 @@
 
       const v = Math.min(100, Math.max(0, Math.round(Number(us.value) * 10) / 10));
       const tone = fngTone(v);
-      valueEl.textContent = v.toFixed(1);
       valueEl.className = 'text-4xl font-extrabold leading-none ' + tone.text;
+      rollNumber(valueEl, v, { format: x => x.toFixed(1) });
       badge.textContent = us.labelKo || tone.label;
       badge.className = 'text-[11px] font-extrabold px-2 py-0.5 mb-1 rounded-full border ml-auto ' + tone.cls;
       marker.style.left = Math.min(99, Math.max(1, v)) + '%';
@@ -1106,11 +1431,15 @@
             const t = fngTone(s);
             return '<div class="flex items-center gap-2">'
               + '<span class="text-[11px] text-slate-400 w-[8.5rem] truncate">' + c.name + ' </span>'
-              + '<div class="flex-1 bg-slate-800 h-1.5 rounded-full overflow-hidden"><div class="h-full rounded-full ' + fngBarColor(s) + '" style="width:' + s + '%"></div></div>'
+              + '<div class="flex-1 bg-slate-800 h-1.5 rounded-full overflow-hidden"><div class="fill-bar h-full rounded-full ' + fngBarColor(s) + '" data-fill="' + s + '" style="width:0"></div></div>'
               + '<span class="text-[11px] font-bold ' + t.text + ' w-7 text-right">' + Math.round(s) + '</span>'
               + '</div>';
           }).join('')
         : '<p class="text-[11px] text-slate-500">구성 지표를 받지 못했습니다.</p>';
+      comps.querySelectorAll('.fill-bar').forEach((el, i) => {
+        el.style.transitionDelay = (80 + i * 40) + 'ms';
+        requestAnimationFrame(() => { el.style.width = el.dataset.fill + '%'; });
+      });
     }
 
     function renderLevelCard(key, obj, cfg) {
@@ -1133,8 +1462,8 @@
       }
 
       const lv = cfg.levelFn ? cfg.levelFn(obj, v) : cnLevel(cfg.kind, v);
-      valEl.textContent = v.toFixed(cfg.digits);
       valEl.className = 'text-3xl font-extrabold leading-none ' + lv.tone.text;
+      rollNumber(valEl, v, { format: x => x.toFixed(cfg.digits) });
       badge.textContent = lv.label;
       badge.className = 'text-[11px] font-extrabold px-2 py-0.5 mb-0.5 rounded-full border ml-auto ' + lv.tone.cls;
       marker.style.left = Math.min(99, Math.max(1, ((v - cfg.min) / (cfg.max - cfg.min)) * 100)) + '%';
@@ -1201,8 +1530,8 @@
       if (kimchi && isFinite(Number(kimchi.premium))) {
         const p = Number(kimchi.premium);
         const tone = kimchiTone(p);
-        kPct.textContent = (p > 0 ? '+' : '') + p.toFixed(2) + '%';
         kPct.className = 'text-3xl font-extrabold leading-none ' + tone.text;
+        rollNumber(kPct, p, { format: x => (x > 0 ? '+' : '') + x.toFixed(2) + '%' });
         kBadge.textContent = tone.badge;
         kBadge.className = 'text-[11px] font-extrabold px-2 py-0.5 mb-0.5 rounded-full border ' + tone.cls;
         kMarker.className = 'absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-2.5 h-2.5 rounded-full ring-2 ring-slate-900 transition-all ' + tone.marker;
@@ -1236,8 +1565,8 @@
       if (fng && fng.value != null && isFinite(Number(fng.value))) {
         const v = Math.min(100, Math.max(0, Math.round(Number(fng.value))));
         const tone = fngTone(v);
-        fValue.textContent = String(v);
         fValue.className = 'text-4xl font-extrabold leading-none ' + tone.text;
+        rollNumber(fValue, v, { format: x => String(Math.round(x)) });
         fBadge.textContent = tone.label;
         fBadge.className = 'text-[11px] font-extrabold px-2 py-0.5 mb-1 rounded-full border ml-auto ' + tone.cls;
         fMarker.style.left = Math.min(99, Math.max(1, v)) + '%';
@@ -1308,6 +1637,17 @@
     // 첫 화면은 로딩 스켈레톤 → data.json 도착 후 실제 수치로 교체
     renderLoading();
     loadData();
+
+    // #039 알약 인디케이터 첫 위치/창 크기 변경 추적
+    movePeriodPill();
+    window.addEventListener('resize', movePeriodPill);
+    window.addEventListener('load', movePeriodPill);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(movePeriodPill).catch(function () {});
+
+    // Esc 로 모달 닫기 (키보드 사용자)
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && isModalOpen()) closeModal();
+    });
   </script>
 
   <!-- PWA 서비스 워커 등록: 오프라인에서도 앱 셸과 직전 시세로 열린다 -->

@@ -3,7 +3,7 @@
  *  · 오프라인: 캐시된 앱 셸 + 직전에 받아 둔 data.json 으로 화면이 열림
  *  · 교차 출처(업비트·코인베이스·공포탐욕·카운터·환율)는 캐시하지 않고 네트워크 직통
  */
-const CACHE_NAME = 'sayo-shell-v1';
+const CACHE_NAME = 'sayo-shell-v2'; // v2: Lucian UI 고도화(039·228·098·154) 반영 — 기존 설치본도 새 셸로 교체
 
 const SHELL_URLS = [
   '/',
