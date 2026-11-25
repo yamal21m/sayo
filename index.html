@@ -448,7 +448,8 @@
       if (!dur || Math.abs(target - from) < 1e-9) { el.textContent = fmt(target); return; }
       const start = performance.now();
       function tick(now) {
-        const t = Math.min(1, (now - start) / dur);
+        // rAF 타임스탬프가 시작 시각보다 조금 이르면 t 가 음수가 되어 첫 프레임에 -1 이 스칠 수 있어 0 으로 자릅니다
+        const t = Math.min(1, Math.max(0, (now - start) / dur));
         const e = 1 - Math.pow(1 - t, 3);
         el.textContent = fmt(from + (target - from) * e);
         if (t < 1) el._rollRaf = requestAnimationFrame(tick);
@@ -461,13 +462,17 @@
     const spot = { x: -500, y: -500, o: 0, target: 0, raf: 0, last: 0, movedAt: 0 };
     function spotPaint() {
       const cards = document.querySelectorAll('.spot');
+      // 읽기(레이아웃)를 먼저 모두 끝낸 뒤 쓰기(스타일)를 해야 프레임마다 재배치가 한 번만 일어납니다
+      const rects = new Array(cards.length);
+      for (let i = 0; i < cards.length; i++) rects[i] = cards[i].getBoundingClientRect();
+      const oText = spot.o.toFixed(3);
       for (let i = 0; i < cards.length; i++) {
         const el = cards[i];
-        const r = el.getBoundingClientRect();
+        const r = rects[i];
         if (r.width === 0 || r.bottom < -80 || r.top > window.innerHeight + 80) continue;
         el.style.setProperty('--cx', (spot.x - r.left).toFixed(1) + 'px');
         el.style.setProperty('--cy', (spot.y - r.top).toFixed(1) + 'px');
-        el.style.setProperty('--o', spot.o.toFixed(3));
+        el.style.setProperty('--o', oText);
       }
     }
     function spotFrame(now) {
@@ -1023,7 +1028,7 @@
       const ms = prefersReducedMotion() ? 0 : (dur || 480);
       const t0 = performance.now();
       function tick(now) {
-        let t = ms ? Math.min(1, (now - t0) / ms) : 1;
+        let t = ms ? Math.min(1, Math.max(0, (now - t0) / ms)) : 1;
         t = 1 - Math.pow(1 - t, 3);
         shape.setAttribute('points', to.map(function (p, i) {
           return p.map(function (n, j) { return (from[i][j] + (n - from[i][j]) * t).toFixed(1); }).join(',');
