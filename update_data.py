@@ -24,7 +24,10 @@ def load_previous_state():
       "usFng": None,
       "vix": None,
       "move": None,
+      "gvz": None,
+      "ovx": None,
       "kospiVol": None,
+      "fxVol": None,
   }
   if not os.path.exists("data.json"):
     return empty
@@ -65,7 +68,10 @@ def load_previous_state():
         "usFng": prev_market.get("usFng"),
         "vix": prev_market.get("vix"),
         "move": prev_market.get("move"),
+        "gvz": prev_market.get("gvz"),
+        "ovx": prev_market.get("ovx"),
         "kospiVol": prev_market.get("kospiVol"),
+        "fxVol": prev_market.get("fxVol"),
     }
   except Exception as e:
     print(f"Warning: could not read previous data.json: {e}")
@@ -399,6 +405,21 @@ KOSPI_VOL_LEVELS = [
     (25, "긴장"),
     (999, "공포"),
 ]
+#   ^GVZ = CBOE 금 변동성 지수, ^OVX = CBOE 원유 변동성 지수
+GVZ_LEVELS = [
+    (15, "안정"),
+    (20, "보통"),
+    (28, "긴장"),
+    (38, "공포"),
+    (999, "극단적 공포"),
+]
+OVX_LEVELS = [
+    (28, "안정"),
+    (38, "보통"),
+    (50, "긴장"),
+    (65, "공포"),
+    (999, "극단적 공포"),
+]
 
 
 def _level_label(value, levels):
@@ -468,6 +489,61 @@ def get_index_snapshot(yf_ticker, prev=None, max_retries=2):
       if attempt < max_retries:
         time.sleep(1.5 * attempt)
   return prev
+
+
+FX_PAIRS = [("KRW=X", "USD/KRW"), ("JPYKRW=X", "JPY/KRW")]
+
+
+def get_fx_realized_vol(yf_ticker, label, prev=None, max_retries=2):
+  """환율 20거래일 실현변동성(연율 %).
+
+  변동성 지수(VIX·MOVE·GVZ·OVX)는 주식·채권·금·원유에만 있고 환율에는
+  무료 지수가 없어, 각 환율 자체의 최근 20거래일 일간 로그수익률
+  표준편차를 연율화(×√252)한 값을 같은 의미의 수치로 씁니다(추정값 아님).
+  """
+  for attempt in range(1, max_retries + 1):
+    try:
+      hist = yf.Ticker(yf_ticker).history(period="3mo")
+      closes_series = _last_close(hist)
+      closes = [float(c) for c in closes_series.tolist()]
+      if len(closes) < 22:
+        raise ValueError("history too short")
+      asof = str(closes_series.index[-1].date())
+      if _asof_regressed(asof, prev):
+        print(
+            f"Warning: {label} 응답 날짜 {asof} 가 직전"
+            f" {prev.get('asof')} 보다 과거라 갱신을 건너뜁니다."
+        )
+        return prev
+      rets = [
+          math.log(closes[i] / closes[i - 1]) for i in range(1, len(closes))
+      ][-20:]
+      mean = sum(rets) / len(rets)
+      var = sum((r - mean) ** 2 for r in rets) / (len(rets) - 1)
+      vol = math.sqrt(var * 252) * 100
+      return {
+          "value": round(vol, 2),
+          "chg1d": round((closes[-1] - closes[-2]) / closes[-2] * 100, 2),
+          "asof": asof,
+      }
+    except Exception as e:
+      print(
+          f"FX realized vol {label} attempt {attempt}/{max_retries} failed: {e}"
+      )
+      if attempt < max_retries:
+        time.sleep(1.5 * attempt)
+  return prev
+
+
+def get_fx_vol_map(prev=None):
+  """환율쌍별 20일 실현변동성을 모아 {표시 티커: 스냅샷} 으로 돌려줍니다."""
+  prev = prev or {}
+  out = {}
+  for yf_t, label in FX_PAIRS:
+    snap = get_fx_realized_vol(yf_t, label, prev.get(label))
+    if isinstance(snap, dict) and isinstance(snap.get("value"), (int, float)):
+      out[label] = snap
+  return out
 
 
 def get_kospi_realized_vol(prev=None, min_asof=None, max_retries=2):
@@ -542,15 +618,35 @@ def calc_rsi(closes, period=14):
 #   · 미장 주식·리츠 : 미국 CNN 공포·탐욕 지수 (미수신 시 중립 50)
 #   · 국장 주식·리츠 : 무료 공식 한국 공탐 지수가 없어 코스피 20거래일 실현변동성의
 #                     공포 구간에만 가산 (변동성이 낮으면 가산 없음)
-#   · 채권·환율·귀금속·원자재 : 해당 자산군 공포 지표가 없어 중립 고정(5점).
-#                     크립토 공탐 지수를 끌어다 쓰지 않습니다.
+#   · 채권          : ICE BofA MOVE 지수(^MOVE, 미국 국채 변동성)
+#   · 귀금속        : CBOE 금 변동성 지수(^GVZ)
+#   · 원자재        : CBOE 원유 변동성 지수(^OVX)
+#   · 환율          : 각 환율 자체의 20거래일 실현변동성(연율 %, ×√252)
+#   변동성 지수는 '평온 → 3점, 공포 이상 → 15점' 선형 스케일로 3~15점을 매깁니다.
 S4_NEUTRAL = 5
 S4_LABEL = {
     "crypto": "크립토 공탐",
     "us": "미장 CNN 공탐",
     "kr": "국장 변동성",
+    "bonds": "채권 MOVE 지수",
+    "metals": "금 변동성(GVZ)",
+    "commodities": "원유 변동성(OVX)",
+    "fx": "환율 20일 변동성",
     "neutral": "자산 중립(공탐 제외)",
 }
+
+
+def vol_fear_score(value, calm, panic):
+  """변동성 지수값 → 공포 가산점(3~15).
+
+  calm 이하면 3점, panic 이상이면 15점, 그 사이는 선형입니다.
+  값이 없으면 None 을 돌려 호출한 쪽이 중립으로 처리하게 합니다.
+  """
+  if not isinstance(value, (int, float)) or isinstance(value, bool):
+    return None
+  ratio = (float(value) - calm) / float(panic - calm) if panic > calm else 0.0
+  ratio = max(0.0, min(1.0, ratio))
+  return int(round(3 + 12 * ratio))
 
 
 def kospi_vol_fear_score(vol):
@@ -619,6 +715,42 @@ def apply_score(item, basis, ctx):
         s4_basis += f" ({vol_info['labelKo']})"
     else:
       s4_basis = "코스피 변동성 미수신 → 중립 가산"
+  elif basis == "bonds":
+    # ICE BofA MOVE: 평온 55~75 · 보통 80~100 · 공포 110~140+
+    val = (ctx.get("move") or {}).get("value")
+    s4 = vol_fear_score(val, 55, 140)
+    if s4 is None:
+      s4 = S4_NEUTRAL
+      s4_basis = "채권 MOVE 미수신 → 중립 5점"
+    else:
+      s4_basis = f"채권 변동성 MOVE {val:.1f}"
+  elif basis == "metals":
+    # CBOE Gold VIX(GVZ): 평온 12~16 · 보통 18~24 · 공포 30~40+
+    val = (ctx.get("gvz") or {}).get("value")
+    s4 = vol_fear_score(val, 12, 38)
+    if s4 is None:
+      s4 = S4_NEUTRAL
+      s4_basis = "금 변동성 GVZ 미수신 → 중립 5점"
+    else:
+      s4_basis = f"CBOE 금 변동성 GVZ {val:.1f}"
+  elif basis == "commodities":
+    # CBOE Oil VIX(OVX): 평온 20~30 · 보통 32~45 · 공포 55~70+
+    val = (ctx.get("ovx") or {}).get("value")
+    s4 = vol_fear_score(val, 20, 65)
+    if s4 is None:
+      s4 = S4_NEUTRAL
+      s4_basis = "원유 변동성 OVX 미수신 → 중립 5점"
+    else:
+      s4_basis = f"CBOE 원유 변동성 OVX {val:.1f}"
+  elif basis == "fx":
+    # 환율 20일 실현변동성: 평온 5% 이하 · 보통 7~10% · 고변동성 14~18%+
+    val = ((ctx.get("fx_vol") or {}).get(str(item["ticker"])) or {}).get("value")
+    s4 = vol_fear_score(val, 4, 16)
+    if s4 is None:
+      s4 = S4_NEUTRAL
+      s4_basis = "환율 변동성 미수신 → 중립 5점"
+    else:
+      s4_basis = f"환율 20일 실현변동성 {val:.1f}%"
   else:
     s4 = S4_NEUTRAL
     s4_basis = "이 자산군은 공탐 지수를 쓰지 않습니다(중립 5점 고정)"
@@ -782,6 +914,18 @@ def main():
   if move and "value" in move:
     move["labelKo"] = _level_label(move["value"], MOVE_LEVELS)
 
+  # 귀금속·원자재 변동성 지수 (채권 MOVE와 같은 무료 야후 시세)
+  gvz = get_index_snapshot("^GVZ", prev_state.get("gvz"))
+  if gvz and "value" in gvz:
+    gvz["labelKo"] = _level_label(gvz["value"], GVZ_LEVELS)
+
+  ovx = get_index_snapshot("^OVX", prev_state.get("ovx"))
+  if ovx and "value" in ovx:
+    ovx["labelKo"] = _level_label(ovx["value"], OVX_LEVELS)
+
+  # 환율은 지수가 없어 각 환율 자체 20일 실현변동성으로 본다
+  fx_vol = get_fx_vol_map(prev_state.get("fxVol"))
+
   kospi_vol = get_kospi_realized_vol(
       prev_state.get("kospiVol"), min_asof=prev_kospi_asof
   )
@@ -789,18 +933,19 @@ def main():
     kospi_vol["labelKo"] = _level_label(kospi_vol["value"], KOSPI_VOL_LEVELS)
 
   # 자산군 아이디(cid) · 아이콘 · 이름 · [(야후 심볼, 표시 티커, 이름, 단위 접두, 단위, [채점4] 기준)]
-  #   [채점4] 기준: crypto(크립토 공탐) / us(미장 CNN 공탄) / kr(코스피 변동성) / neutral(중립 5점)
+  #   [채점4] 기준: crypto(크립토 공탐) / us(미장 CNN 공탐) / kr(코스피 변동성)
+  #             / bonds(MOVE) / fx(환율 실현변동성) / metals(GVZ) / commodities(OVX)
   config = [
       (
           "bonds",
           "💵",
           "채권 · 환율",
           [
-              ("TLT", "TLT", "미국 20년+ 장기채", "$", "", "neutral"),
-              ("IEF", "IEF", "미국 7-10년 중기채", "$", "", "neutral"),
-              ("JPYKRW=X", "JPY/KRW", "엔화 환율 (100엔)", "", "원", "neutral"),
-              ("SGOV", "SGOV", "미국 초단기채(파킹)", "$", "", "neutral"),
-              ("KRW=X", "USD/KRW", "달러 환율", "", "원", "neutral"),
+              ("TLT", "TLT", "미국 20년+ 장기채", "$", "", "bonds"),
+              ("IEF", "IEF", "미국 7-10년 중기채", "$", "", "bonds"),
+              ("JPYKRW=X", "JPY/KRW", "엔화 환율 (100엔)", "", "원", "fx"),
+              ("SGOV", "SGOV", "미국 초단기채(파킹)", "$", "", "bonds"),
+              ("KRW=X", "USD/KRW", "달러 환율", "", "원", "fx"),
           ],
       ),
       (
@@ -808,8 +953,8 @@ def main():
           "🥈",
           "귀금속 (금·은)",
           [
-              ("SLV", "SLV", "은 ETF (Silver)", "$", "", "neutral"),
-              ("GLD", "GLD", "금 ETF (Gold)", "$", "", "neutral"),
+              ("SLV", "SLV", "은 ETF (Silver)", "$", "", "metals"),
+              ("GLD", "GLD", "금 ETF (Gold)", "$", "", "metals"),
           ],
       ),
       (
@@ -827,8 +972,8 @@ def main():
           "🛢️",
           "원자재 (유가·구리)",
           [
-              ("USO", "USO", "WTI 원유 ETF", "$", "", "neutral"),
-              ("CPER", "CPER", "구리 ETF (닥터코퍼)", "$", "", "neutral"),
+              ("USO", "USO", "WTI 원유 ETF", "$", "", "commodities"),
+              ("CPER", "CPER", "구리 ETF (닥터코퍼)", "$", "", "commodities"),
           ],
       ),
       (
@@ -864,6 +1009,10 @@ def main():
       "us_fng": us_fng,
       "kospi_vol": kospi_vol,
       "hl_funding": hl_funding,
+      "move": move,
+      "gvz": gvz,
+      "ovx": ovx,
+      "fx_vol": fx_vol,
   }
 
   for cid, icon, cname, tickers in config:
@@ -1088,7 +1237,10 @@ def main():
       "usFng": us_fng,
       "vix": vix,
       "move": move,
+      "gvz": gvz,
+      "ovx": ovx,
       "kospiVol": kospi_vol,
+      "fxVol": fx_vol,
   }
 
   output = {
@@ -1127,6 +1279,14 @@ def main():
     print(f"VIX: {vix['value']} ({vix.get('labelKo')}) as of {vix.get('asof')}")
   if move:
     print(f"MOVE: {move['value']} ({move.get('labelKo')}) as of {move.get('asof')}")
+  if gvz:
+    print(f"GVZ: {gvz['value']} ({gvz.get('labelKo')}) as of {gvz.get('asof')}")
+  if ovx:
+    print(f"OVX: {ovx['value']} ({ovx.get('labelKo')}) as of {ovx.get('asof')}")
+  for pair, info in (fx_vol or {}).items():
+    print(
+        f"FX realized vol {pair}: {info['value']}% as of {info.get('asof')}"
+    )
   if kospi_vol:
     print(
         "KOSPI 20d realized vol:"
