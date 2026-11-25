@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026.11.26 06:20 KST 업데이트",
+  "updatedAt": "2026.11.26 07:50 KST 업데이트",
   "categories": [
     {
       "id": "bonds",
@@ -49,14 +49,14 @@
         {
           "ticker": "JPY/KRW",
           "name": "엔화 환율 (100엔)",
-          "price": "841원",
-          "chg1d": -0.2,
-          "chg1w": 0.7,
+          "price": "842원",
+          "chg1d": -0.1,
+          "chg1w": 0.8,
           "asof": "2026-11-25",
-          "maDiff": -6.97,
-          "mddPct": 13.2,
-          "rsi": 45.7,
-          "boxPos": 0.053,
+          "maDiff": -6.87,
+          "mddPct": 13.1,
+          "rsi": 46.4,
+          "boxPos": 0.059,
           "score": 64,
           "s1": 21,
           "s2": 14,
@@ -140,10 +140,10 @@
           "chg1d": 0.6,
           "chg1w": -4.0,
           "asof": "2026-11-25",
-          "maDiff": -18.9,
-          "mddPct": 33.96,
-          "rsi": 22.6,
-          "boxPos": 0.027,
+          "maDiff": -18.91,
+          "mddPct": 33.97,
+          "rsi": 22.5,
+          "boxPos": 0.026,
           "score": 88,
           "s1": 27,
           "s2": 29,
@@ -388,9 +388,9 @@
           "chg1d": 0.5,
           "chg1w": 4.1,
           "asof": "2026-11-25",
-          "maDiff": -20.22,
-          "mddPct": 49.75,
-          "rsi": 24.6,
+          "maDiff": -20.2,
+          "mddPct": 49.73,
+          "rsi": 24.7,
           "boxPos": 0.068,
           "score": 89,
           "s1": 28,
@@ -399,19 +399,19 @@
           "s4": 13,
           "s4Label": "크립토 공탐",
           "s4Basis": "크립토 공포탐욕 13 (극단적 공포)",
-          "comment": "200일 평균선 대비 -20.2%, 1년 고점 대비 -49.8%로 과매도 구간입니다. 장기 적립 비중을 늘리기 좋은 초록불 구간입니다."
+          "comment": "200일 평균선 대비 -20.2%, 1년 고점 대비 -49.7%로 과매도 구간입니다. 장기 적립 비중을 늘리기 좋은 초록불 구간입니다."
         },
         {
           "ticker": "BTC",
           "name": "비트코인 (Bitcoin)",
-          "price": "$60,167",
-          "chg1d": 0.7,
+          "price": "$60,133",
+          "chg1d": 0.6,
           "chg1w": 2.3,
           "asof": "2026-11-25",
-          "maDiff": -16.47,
-          "mddPct": 37.93,
-          "rsi": 18.5,
-          "boxPos": 0.042,
+          "maDiff": -16.51,
+          "mddPct": 37.96,
+          "rsi": 18.4,
+          "boxPos": 0.041,
           "score": 88,
           "s1": 26,
           "s2": 30,
@@ -419,7 +419,7 @@
           "s4": 13,
           "s4Label": "크립토 공탐",
           "s4Basis": "크립토 공포탐욕 13 (극단적 공포)",
-          "comment": "200일 평균선 대비 -16.5%, 1년 고점 대비 -37.9%로 과매도 구간입니다. 장기 적립 비중을 늘리기 좋은 초록불 구간입니다."
+          "comment": "200일 평균선 대비 -16.5%, 1년 고점 대비 -38.0%로 과매도 구간입니다. 장기 적립 비중을 늘리기 좋은 초록불 구간입니다."
         },
         {
           "ticker": "SOL",
@@ -428,10 +428,10 @@
           "chg1d": 1.3,
           "chg1w": 2.6,
           "asof": "2026-11-25",
-          "maDiff": -19.88,
+          "maDiff": -19.89,
           "mddPct": 51.95,
           "rsi": 30.7,
-          "boxPos": 0.099,
+          "boxPos": 0.098,
           "score": 86,
           "s1": 28,
           "s2": 27,
@@ -502,9 +502,9 @@
   ],
   "market": {
     "kimchi": {
-      "premium": 1.09,
-      "upbitKrw": 81639000,
-      "overseasUsd": 60133.35,
+      "premium": 1.14,
+      "upbitKrw": 81659000,
+      "overseasUsd": 60115.57,
       "usdKrw": 1343.04,
       "usdSource": "Coinbase",
       "fxSource": "open.er-api.com"
@@ -518,7 +518,7 @@
       "value": 15.2,
       "label": "extreme fear",
       "labelKo": "극단적 공포",
-      "timestamp": "2026-11-25T21:06:22+00:00",
+      "timestamp": "2026-11-25T22:26:17+00:00",
       "previousClose": 17.4,
       "previous1Week": 29.9,
       "previous1Month": 16.7,
@@ -583,16 +583,16 @@
       "source": "CNN Fear & Greed"
     },
     "vix": {
-      "value": 27.9,
-      "chg1d": 5.84,
-      "chg1w": 13.6,
+      "value": 28.29,
+      "chg1d": 7.32,
+      "chg1w": 15.19,
       "asof": "2026-11-25",
       "labelKo": "공포"
     },
     "move": {
-      "value": 97.52,
-      "chg1d": -1.33,
-      "chg1w": -0.64,
+      "value": 97.54,
+      "chg1d": -1.32,
+      "chg1w": -0.62,
       "asof": "2026-11-25",
       "labelKo": "긴장"
     },
@@ -624,8 +624,8 @@
         "asof": "2026-11-25"
       },
       "JPY/KRW": {
-        "value": 11.4,
-        "chg1d": -0.22,
+        "value": 11.37,
+        "chg1d": -0.11,
         "asof": "2026-11-25"
       }
     }
