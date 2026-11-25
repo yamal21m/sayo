@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026.11.26 06:02 KST 업데이트",
+  "updatedAt": "2026.11.26 06:07 KST 업데이트",
   "categories": [
     {
       "id": "bonds",
@@ -49,14 +49,14 @@
         {
           "ticker": "JPY/KRW",
           "name": "엔화 환율 (100엔)",
-          "price": "842원",
+          "price": "841원",
           "chg1d": -0.2,
           "chg1w": 0.7,
           "asof": "2026-11-25",
-          "maDiff": -6.94,
-          "mddPct": 13.18,
+          "maDiff": -6.96,
+          "mddPct": 13.19,
           "rsi": 45.8,
-          "boxPos": 0.054,
+          "boxPos": 0.053,
           "score": 59,
           "s1": 21,
           "s2": 14,
@@ -89,14 +89,14 @@
         {
           "ticker": "USD/KRW",
           "name": "달러 환율",
-          "price": "1,344원",
+          "price": "1,343원",
           "chg1d": 0.2,
           "chg1w": 0.8,
           "asof": "2026-11-25",
-          "maDiff": -6.53,
-          "mddPct": 13.56,
-          "rsi": 52.2,
-          "boxPos": 0.094,
+          "maDiff": -6.55,
+          "mddPct": 13.58,
+          "rsi": 52.1,
+          "boxPos": 0.093,
           "score": 56,
           "s1": 21,
           "s2": 12,
@@ -384,13 +384,13 @@
         {
           "ticker": "ETH",
           "name": "이더리움 (Ethereum)",
-          "price": "$1,689",
-          "chg1d": 0.7,
-          "chg1w": 4.3,
+          "price": "$1,687",
+          "chg1d": 0.6,
+          "chg1w": 4.2,
           "asof": "2026-11-25",
-          "maDiff": -20.06,
-          "mddPct": 49.65,
-          "rsi": 25.0,
+          "maDiff": -20.14,
+          "mddPct": 49.7,
+          "rsi": 24.8,
           "boxPos": 0.069,
           "score": 89,
           "s1": 28,
@@ -399,19 +399,19 @@
           "s4": 13,
           "s4Label": "크립토 공탐",
           "s4Basis": "크립토 공포탐욕 13 (극단적 공포)",
-          "comment": "200일 평균선 대비 -20.1%, 1년 고점 대비 -49.6%로 과매도 구간입니다. 장기 적립 비중을 늘리기 좋은 초록불 구간입니다."
+          "comment": "200일 평균선 대비 -20.1%, 1년 고점 대비 -49.7%로 과매도 구간입니다. 장기 적립 비중을 늘리기 좋은 초록불 구간입니다."
         },
         {
           "ticker": "BTC",
           "name": "비트코인 (Bitcoin)",
-          "price": "$60,242",
-          "chg1d": 0.8,
-          "chg1w": 2.5,
+          "price": "$60,312",
+          "chg1d": 0.9,
+          "chg1w": 2.6,
           "asof": "2026-11-25",
-          "maDiff": -16.36,
-          "mddPct": 37.85,
-          "rsi": 18.8,
-          "boxPos": 0.044,
+          "maDiff": -16.27,
+          "mddPct": 37.78,
+          "rsi": 19.0,
+          "boxPos": 0.046,
           "score": 88,
           "s1": 26,
           "s2": 30,
@@ -419,19 +419,19 @@
           "s4": 13,
           "s4Label": "크립토 공탐",
           "s4Basis": "크립토 공포탐욕 13 (극단적 공포)",
-          "comment": "200일 평균선 대비 -16.4%, 1년 고점 대비 -37.9%로 과매도 구간입니다. 장기 적립 비중을 늘리기 좋은 초록불 구간입니다."
+          "comment": "200일 평균선 대비 -16.3%, 1년 고점 대비 -37.8%로 과매도 구간입니다. 장기 적립 비중을 늘리기 좋은 초록불 구간입니다."
         },
         {
           "ticker": "SOL",
           "name": "솔라나 (Solana)",
-          "price": "$70.6",
-          "chg1d": 1.3,
-          "chg1w": 2.7,
+          "price": "$70.5",
+          "chg1d": 1.2,
+          "chg1w": 2.5,
           "asof": "2026-11-25",
-          "maDiff": -19.82,
-          "mddPct": 51.91,
-          "rsi": 30.8,
-          "boxPos": 0.099,
+          "maDiff": -19.93,
+          "mddPct": 51.98,
+          "rsi": 30.6,
+          "boxPos": 0.098,
           "score": 86,
           "s1": 28,
           "s2": 27,
@@ -439,7 +439,7 @@
           "s4": 13,
           "s4Label": "크립토 공탐",
           "s4Basis": "크립토 공포탐욕 13 (극단적 공포)",
-          "comment": "200일 평균선 대비 -19.8%, 1년 고점 대비 -51.9%로 과매도 구간입니다. 장기 적립 비중을 늘리기 좋은 초록불 구간입니다."
+          "comment": "200일 평균선 대비 -19.9%, 1년 고점 대비 -52.0%로 과매도 구간입니다. 장기 적립 비중을 늘리기 좋은 초록불 구간입니다."
         }
       ]
     }
@@ -502,9 +502,9 @@
   ],
   "market": {
     "kimchi": {
-      "premium": 1.15,
-      "upbitKrw": 81795000,
-      "overseasUsd": 60211.27,
+      "premium": 1.08,
+      "upbitKrw": 81897000,
+      "overseasUsd": 60329.17,
       "usdKrw": 1343.04,
       "usdSource": "Coinbase",
       "fxSource": "open.er-api.com"
@@ -541,21 +541,21 @@
         {
           "key": "stock_price_breadth",
           "name": "시장 폭(상승 종목)",
-          "score": 17.2,
+          "score": 17.8,
           "rating": "extreme fear",
           "labelKo": "극단적 공포"
         },
         {
           "key": "put_call_options",
           "name": "풋/콜 옵션",
-          "score": 6.6,
+          "score": 6.8,
           "rating": "extreme fear",
           "labelKo": "극단적 공포"
         },
         {
           "key": "market_volatility_vix",
           "name": "VIX 변동성",
-          "score": 34.2,
+          "score": 36.7,
           "rating": "fear",
           "labelKo": "공포"
         },
@@ -576,16 +576,16 @@
       ],
       "putCall": {
         "value": 0.92,
-        "score": 6.6,
+        "score": 6.8,
         "rating": "extreme fear",
         "labelKo": "극단적 공포"
       },
       "source": "CNN Fear & Greed"
     },
     "vix": {
-      "value": 28.16,
-      "chg1d": 6.83,
-      "chg1w": 14.66,
+      "value": 27.94,
+      "chg1d": 5.99,
+      "chg1w": 13.76,
       "asof": "2026-11-25",
       "labelKo": "공포"
     },
