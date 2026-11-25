@@ -8,6 +8,15 @@
        다시 만들 때: npx tailwindcss -c tailwind.config.js -i tw-input.css -o style.css --minify -->
   <link rel="preload" href="./data.json" as="fetch" crossorigin="anonymous" />
   <link rel="stylesheet" href="./style.css" />
+  <!-- PWA: 홈 화면/데스크톱에 앱으로 설치 -->
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon-180.png" />
+  <meta name="theme-color" content="#0b0f19" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="SAYO" />
   <style>
     body { font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif; background-color: #0b0f19; color: #f1f5f9; }
     .card-hover { transition: all 0.2s ease; }
@@ -1299,6 +1308,15 @@
     // 첫 화면은 로딩 스켈레톤 → data.json 도착 후 실제 수치로 교체
     renderLoading();
     loadData();
+  </script>
+
+  <!-- PWA 서비스 워커 등록: 오프라인에서도 앱 셸과 직전 시세로 열린다 -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(() => { /* 등록 실패해도 웹 화면은 그대로 동작 */ });
+      });
+    }
   </script>
 </body>
 </html>
