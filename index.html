@@ -489,7 +489,10 @@
       spot.last = performance.now();
       spot.raf = requestAnimationFrame(spotFrame);
     }
+    // 호버가 없는 터치 기기(hover: none)에서는 스포트라이트를 아예 켜지 않습니다
+    const spotPointerQuery = window.matchMedia ? window.matchMedia('(hover: hover) and (pointer: fine)') : null;
     document.addEventListener('pointermove', function (e) {
+      if (spotPointerQuery && !spotPointerQuery.matches) return;
       if (e.pointerType && e.pointerType !== 'mouse' && e.pointerType !== 'pen') return;
       spot.x = e.clientX;
       spot.y = e.clientY;
