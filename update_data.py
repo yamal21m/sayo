@@ -528,15 +528,138 @@ def calc_rsi(closes, period=14):
   return 100.0 - (100.0 / (1.0 + rs))
 
 
-# 4. 개별 종목 데이터 수집 및 100점 채점 공식 (2회 재시도 + 직전 정상값 보존)
+# 4. 점수 산식 (100점 = s1 35 + s2 30 + s3 20 + s4 15)
+#
+#   [채점 1] 200일 평균선 대비 위치 — 평균선 부근(0%)은 17점. 아래로 갈수록 완만하게
+#            (-0.55점/%), 위로 갈수록 빠르게(-1.2점/%) 깎입니다. 만점(35)은
+#            -33% 이하의 큰 할인 구간에서만 나옵니다.
+#   [채점 2] 1년 고점 대비 할인율 + RSI 과매도 (30점)
+#   [채점 3] 1년 가격 박스권 위치 (20점)
+#   [채점 4] 공포 심리 — 자산군마다 기준 지표가 다릅니다(아래 S4_*).
+#
+# [채점 4] 공포 심리 기준 (자산군별 분리)
+#   · 크립토        : 크립토 공포·탐욕 지수(alternative.me) + Hyperliquid 마이너스 펀딩비
+#   · 미장 주식·리츠 : 미국 CNN 공포·탐욕 지수 (미수신 시 중립 50)
+#   · 국장 주식·리츠 : 무료 공식 한국 공탐 지수가 없어 코스피 20거래일 실현변동성의
+#                     공포 구간에만 가산 (변동성이 낮으면 가산 없음)
+#   · 채권·환율·귀금속·원자재 : 해당 자산군 공포 지표가 없어 중립 고정(5점).
+#                     크립토 공탐 지수를 끌어다 쓰지 않습니다.
+S4_NEUTRAL = 5
+S4_LABEL = {
+    "crypto": "크립토 공탐",
+    "us": "미장 CNN 공탐",
+    "kr": "국장 변동성",
+    "neutral": "자산 중립(공탐 제외)",
+}
+
+
+def kospi_vol_fear_score(vol):
+  """코스피 20일 실현변동성 → 공포 가산점(4~15). 낮은 변동성은 가산하지 않습니다."""
+  if not isinstance(vol, (int, float)):
+    return 7
+  if vol < 12:
+    return 4
+  if vol < 18:
+    return 6
+  if vol < 25:
+    return 9
+  if vol < 35:
+    return 12
+  return 15
+
+
+def apply_score(item, basis, ctx):
+  """수집한 원 지표(item)로 s1~s4·총점·코멘트를 다시 계산해 item에 채웁니다."""
+  ma_diff = float(item["maDiff"])
+  mdd = float(item["mddPct"])
+  rsi = float(item["rsi"])
+  box = float(item["boxPos"])
+
+  # [채점 1] 200일 평균선 대비 (35점 만점: 평균선보다 낮을수록 고득점)
+  slope = 1.2 if ma_diff > 0 else 0.55
+  s1 = int(max(5, min(35, round(17 - ma_diff * slope))))
+
+  # [채점 2] 1년 고점 대비 할인율(MDD) + RSI 과매도 (30점 만점)
+  rsi_score = max(0, min(15, round((70 - rsi) * 0.3)))
+  mdd_score = max(0, min(15, round(mdd * 0.5)))
+  s2 = int(max(4, min(30, rsi_score + mdd_score)))
+
+  # [채점 3] 1년 가격 박스권 위치 매력도 (20점 만점: 박스권 하단일수록 고득점)
+  s3 = int(max(4, min(20, round((1.0 - box) * 20))))
+
+  # [채점 4] 자산군별 공포 심리 (15점 만점)
+  if basis == "crypto":
+    fng_info = ctx.get("crypto_fng") or {}
+    fng_val = fng_info.get("value", 50)
+    s4 = int(max(3, min(15, round((100 - fng_val) * 0.15))))
+    s4_basis = f"크립토 공포탐욕 {fng_val} ({fng_info.get('labelKo', '중립')})"
+    coin_key = str(item["ticker"]).replace("/KRW", "")
+    funding = ctx.get("hl_funding") or {}
+    if coin_key in funding and funding[coin_key] < 0:
+      s4 = min(15, s4 + 3)  # 숏 과열(마이너스 펀딩비) 시 역발상 가산점
+      s4_basis += " · 마이너스 펀딩비 +3"
+  elif basis == "us":
+    us_fng = ctx.get("us_fng") or {}
+    us_val = us_fng.get("value")
+    if isinstance(us_val, (int, float)):
+      s4 = int(max(3, min(15, round((100 - us_val) * 0.15))))
+      s4_basis = f"미장 CNN 공포탐욕 {us_val}"
+      if us_fng.get("labelKo"):
+        s4_basis += f" ({us_fng['labelKo']})"
+    else:
+      s4 = int(max(3, min(15, round((100 - 50) * 0.15))))
+      s4_basis = "미장 CNN 공탐 미수신 → 중립 50으로 계산"
+  elif basis == "kr":
+    vol_info = ctx.get("kospi_vol") or {}
+    vol = vol_info.get("value")
+    s4 = kospi_vol_fear_score(vol)
+    if isinstance(vol, (int, float)):
+      s4_basis = f"코스피 20일 변동성 {vol}%"
+      if vol_info.get("labelKo"):
+        s4_basis += f" ({vol_info['labelKo']})"
+    else:
+      s4_basis = "코스피 변동성 미수신 → 중립 가산"
+  else:
+    s4 = S4_NEUTRAL
+    s4_basis = "이 자산군은 공탐 지수를 쓰지 않습니다(중립 5점 고정)"
+
+  total_score = s1 + s2 + s3 + s4
+
+  # 자동 코멘트 생성 (신호등 커트라인 80 / 40 과 같은 기준)
+  if total_score >= 80:
+    comment = (
+        f"200일 평균선 대비 {ma_diff:+.1f}%, 1년 고점 대비 -{mdd:.1f}%로"
+        " 과매도 구간입니다. 장기 적립 비중을 늘리기 좋은 초록불 구간입니다."
+    )
+  elif total_score >= 40:
+    comment = (
+        f"장기 추세선 부근의 적정 가치 구간(RSI {rsi:.0f})입니다. 정해진"
+        " 날짜에 평소대로 분할 적립을 유지하세요."
+    )
+  else:
+    comment = (
+        "단기 급등으로 장기 평균선 대비"
+        f" {ma_diff:+.1f}% 위치한 과열 구간입니다. 추격 매수는 참아 보고"
+        " 눌림목을 기다리세요."
+    )
+
+  item["score"] = total_score
+  item["s1"] = s1
+  item["s2"] = s2
+  item["s3"] = s3
+  item["s4"] = s4
+  item["s4Label"] = S4_LABEL.get(basis, S4_LABEL["neutral"])
+  item["s4Basis"] = s4_basis
+  item["comment"] = comment
+  return item
+
+
 def analyze_ticker(
     yf_ticker,
     display_ticker,
     name,
     unit_prefix,
     unit_suffix,
-    fng,
-    hl_funding,
     prev_item=None,
     min_asof=None,
     max_retries=2,
@@ -577,29 +700,14 @@ def analyze_ticker(
       )
       rsi = calc_rsi(closes)
 
-      # [채점 1] 200일 평균선 대비 위치 (35점 만점: 평균선보다 낮을수록 고득점)
+      # 채점에 쓰는 원 지표를 그대로 담아 둡니다. 점수(s1~s4)는 main()에서 자산군별
+      # 기준을 붙여 매기므로, 시세 조회가 실패해 직전 스냅샷을 유지할 때도 같은
+      # 산식으로 다시 채점할 수 있습니다.
       ma_diff_pct = ((curr - ma200) / ma200) * 100
-      s1 = int(max(5, min(35, round(22 - ma_diff_pct * 1.2))))
-
-      # [채점 2] 1년 고점 대비 할인율(MDD) + RSI 과매도 (30점 만점)
       mdd_pct = ((high_1y - curr) / high_1y) * 100
-      rsi_score = max(0, min(15, round((70 - rsi) * 0.35)))
-      mdd_score = max(0, min(15, round(mdd_pct * 0.7)))
-      s2 = int(max(4, min(30, rsi_score + mdd_score)))
-
-      # [채점 3] 1년 가격 박스권 위치 매력도 (20점 만점: 박스권 하단일수록 고득점)
       box_pos = (
           (curr - low_1y) / (high_1y - low_1y) if high_1y != low_1y else 0.5
       )
-      s3 = int(max(4, min(20, round((1.0 - box_pos) * 20))))
-
-      # [채점 4] 시장 공포심리 & 선물 펀딩비 역발상 점수 (15점 만점)
-      s4 = int(max(3, min(15, round((100 - fng) * 0.15))))
-      coin_key = display_ticker.replace("/KRW", "")
-      if coin_key in hl_funding and hl_funding[coin_key] < 0:
-        s4 = min(15, s4 + 3)  # 숏 과열(마이너스 펀딩비) 시 역발상 가산점
-
-      total_score = s1 + s2 + s3 + s4
 
       # 가격 포맷팅
       if unit_suffix == "원":
@@ -612,42 +720,22 @@ def analyze_ticker(
             else f"{unit_prefix}{curr:,.0f}"
         )
 
-      # 자동 코멘트 생성
-      if total_score >= 70:
-        comment = (
-            "200일 평균선 대비 유리한 구간이며 고점 대비"
-            f" -{mdd_pct:.1f}% 할인 중입니다. 장기 적립 비중을 늘리기 좋은"
-            " 초록불 구간입니다."
-        )
-      elif total_score >= 40:
-        comment = (
-            f"장기 추세선 부근의 적정 가치 구간(RSI {rsi:.0f})입니다. 정해진"
-            " 날짜에 평소대로 분할 적립을 유지하세요."
-        )
-      else:
-        comment = (
-            "단기 급등으로 장기 평균선 대비"
-            f" {ma_diff_pct:+.1f}% 위치한 과열 구간입니다. 추격 매수는 참아 보고"
-            " 눌림목을 기다리세요."
-        )
-
       return {
           "ticker": display_ticker,
           "name": name,
           "price": price_str,
           "chg1d": chg1d,
           "chg1w": chg1w,
-          "score": total_score,
-          "s1": s1,
-          "s2": s2,
-          "s3": s3,
-          "s4": s4,
-          "comment": comment,
           "asof": asof,
           "raw_price": curr,
-          # 1년 고점 대비 할인율: '국장 vs 미장' 상대 비교에 씁니다(저장 전 제거).
+          # 1년 고점 대비 할인율: '국장 vs 미장' 상대 비교에 쓴 뒤 저장 전 제거합니다.
           "raw_mdd": round(mdd_pct, 2),
           "raw_high_date": high_date,
+          # 점수 재계산용 원 지표(모달 설명·검증에도 그대로 쓸 수 있습니다)
+          "maDiff": round(ma_diff_pct, 2),
+          "mddPct": round(mdd_pct, 2),
+          "rsi": round(rsi, 1),
+          "boxPos": round(box_pos, 3),
       }
     except Exception as e:
       print(f"Error on {display_ticker} (attempt {attempt}/{max_retries}): {e}")
@@ -700,17 +788,19 @@ def main():
   if kospi_vol and "value" in kospi_vol:
     kospi_vol["labelKo"] = _level_label(kospi_vol["value"], KOSPI_VOL_LEVELS)
 
+  # 자산군 아이디(cid) · 아이콘 · 이름 · [(야후 심볼, 표시 티커, 이름, 단위 접두, 단위, [채점4] 기준)]
+  #   [채점4] 기준: crypto(크립토 공탐) / us(미장 CNN 공탄) / kr(코스피 변동성) / neutral(중립 5점)
   config = [
       (
           "bonds",
           "💵",
           "채권 · 환율",
           [
-              ("TLT", "TLT", "미국 20년+ 장기채", "$", ""),
-              ("IEF", "IEF", "미국 7-10년 중기채", "$", ""),
-              ("JPYKRW=X", "JPY/KRW", "엔화 환율 (100엔)", "", "원"),
-              ("SGOV", "SGOV", "미국 초단기채(파킹)", "$", ""),
-              ("KRW=X", "USD/KRW", "달러 환율", "", "원"),
+              ("TLT", "TLT", "미국 20년+ 장기채", "$", "", "neutral"),
+              ("IEF", "IEF", "미국 7-10년 중기채", "$", "", "neutral"),
+              ("JPYKRW=X", "JPY/KRW", "엔화 환율 (100엔)", "", "원", "neutral"),
+              ("SGOV", "SGOV", "미국 초단기채(파킹)", "$", "", "neutral"),
+              ("KRW=X", "USD/KRW", "달러 환율", "", "원", "neutral"),
           ],
       ),
       (
@@ -718,8 +808,8 @@ def main():
           "🥈",
           "귀금속 (금·은)",
           [
-              ("SLV", "SLV", "은 ETF (Silver)", "$", ""),
-              ("GLD", "GLD", "금 ETF (Gold)", "$", ""),
+              ("SLV", "SLV", "은 ETF (Silver)", "$", "", "neutral"),
+              ("GLD", "GLD", "금 ETF (Gold)", "$", "", "neutral"),
           ],
       ),
       (
@@ -727,9 +817,9 @@ def main():
           "🏢",
           "부동산 리츠",
           [
-              ("O", "O", "리얼티 인컴 (월배당)", "$", ""),
-              ("VNQ", "VNQ", "미국 부동산 리츠", "$", ""),
-              ("476800.KS", "TIGER리츠", "한국 리츠 인프라", "", "원"),
+              ("O", "O", "리얼티 인컴 (월배당)", "$", "", "us"),
+              ("VNQ", "VNQ", "미국 부동산 리츠", "$", "", "us"),
+              ("476800.KS", "TIGER리츠", "한국 리츠 인프라", "", "원", "kr"),
           ],
       ),
       (
@@ -737,8 +827,8 @@ def main():
           "🛢️",
           "원자재 (유가·구리)",
           [
-              ("USO", "USO", "WTI 원유 ETF", "$", ""),
-              ("CPER", "CPER", "구리 ETF (닥터코퍼)", "$", ""),
+              ("USO", "USO", "WTI 원유 ETF", "$", "", "neutral"),
+              ("CPER", "CPER", "구리 ETF (닥터코퍼)", "$", "", "neutral"),
           ],
       ),
       (
@@ -746,11 +836,11 @@ def main():
           "📈",
           "주식 (미·한)",
           [
-              ("SCHD", "SCHD", "미국 배당다우존스", "$", ""),
-              ("SOXX", "SOXX", "미국 반도체 ETF", "$", ""),
-              ("^KS11", "KOSPI", "한국 코스피 지수", "", ""),
-              ("SPY", "SPY", "미국 S&P 500", "$", ""),
-              ("QQQ", "QQQ", "미국 나스닥 100", "$", ""),
+              ("SCHD", "SCHD", "미국 배당다우존스", "$", "", "us"),
+              ("SOXX", "SOXX", "미국 반도체 ETF", "$", "", "us"),
+              ("^KS11", "KOSPI", "한국 코스피 지수", "", "", "kr"),
+              ("SPY", "SPY", "미국 S&P 500", "$", "", "us"),
+              ("QQQ", "QQQ", "미국 나스닥 100", "$", "", "us"),
           ],
       ),
       (
@@ -758,9 +848,9 @@ def main():
           "🪙",
           "크립토 (코인)",
           [
-              ("ETH-USD", "ETH", "이더리움 (Ethereum)", "$", ""),
-              ("BTC-USD", "BTC", "비트코인 (Bitcoin)", "$", ""),
-              ("SOL-USD", "SOL", "솔라나 (Solana)", "$", ""),
+              ("ETH-USD", "ETH", "이더리움 (Ethereum)", "$", "", "crypto"),
+              ("BTC-USD", "BTC", "비트코인 (Bitcoin)", "$", "", "crypto"),
+              ("SOL-USD", "SOL", "솔라나 (Solana)", "$", "", "crypto"),
           ],
       ),
   ]
@@ -769,10 +859,16 @@ def main():
   raw_map = {}
   mdd_map = {}
   high_date_map = {}
+  score_ctx = {
+      "crypto_fng": fng_info,
+      "us_fng": us_fng,
+      "kospi_vol": kospi_vol,
+      "hl_funding": hl_funding,
+  }
 
   for cid, icon, cname, tickers in config:
     items = []
-    for yf_t, disp_t, tname, pre, suf in tickers:
+    for yf_t, disp_t, tname, pre, suf, basis in tickers:
       p_item = prev_items.get(disp_t)
       res = analyze_ticker(
           yf_t,
@@ -780,8 +876,6 @@ def main():
           tname,
           pre,
           suf,
-          fng,
-          hl_funding,
           prev_item=p_item,
           min_asof=prev_kospi_asof if yf_t == "^KS11" else None,
           max_retries=2,
@@ -796,6 +890,9 @@ def main():
           mdd_map[disp_t] = raw_mdd
         if raw_high_date:
           high_date_map[disp_t] = raw_high_date
+        # 시세 조회가 실패해 직전 스냅샷을 유지한 종목도 같은 산식으로 다시 채점합니다.
+        if "maDiff" in res:
+          apply_score(res, basis, score_ctx)
         items.append(res)
     if items:
       categories.append(
@@ -1046,6 +1143,17 @@ def main():
         f"KOSPI: {kospi_item['price']} ({kospi_item['score']}점) as of"
         f" {kospi_item.get('asof')}"
     )
+
+  # 신호등 분포를 로그에 남깁니다 (커트라인 80 / 40)
+  all_items = [it for cat in categories for it in cat["items"]]
+  greens = [it["ticker"] for it in all_items if it.get("score", 0) >= 80]
+  print(
+      f"Signal split: 🟢 {len(greens)} / 🟡"
+      f" {sum(1 for it in all_items if 40 <= it.get('score', 0) < 80)} / 🔴"
+      f" {sum(1 for it in all_items if it.get('score', 0) < 40)} (total"
+      f" {len(all_items)})"
+  )
+  print(f"🟢 지금 사요(80점↑): {', '.join(greens) if greens else '없음'}")
 
 
 if __name__ == "__main__":

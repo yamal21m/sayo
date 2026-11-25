@@ -56,7 +56,7 @@
           <span class="text-slate-400 font-semibold">오늘 가장 싼 자산을 계산하는 중입니다…</span>
         </p>
       </div>
-      <button onclick="filterGreenOnly()" id="filter-btn" aria-pressed="false" title="70점 이상(초록불) 자산이 있는 카테고리만 남기고, 다시 누르면 전체 보기로 돌아옵니다" class="text-xs font-bold bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 px-3 py-1.5 rounded-lg transition self-start sm:self-auto">
+      <button onclick="filterGreenOnly()" id="filter-btn" aria-pressed="false" title="80점 이상(초록불) 자산이 있는 카테고리만 남기고, 다시 누르면 전체 보기로 돌아옵니다" class="text-xs font-bold bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 px-3 py-1.5 rounded-lg transition self-start sm:self-auto">
         🟢 '지금 사요!'만 모아보기
       </button>
     </div>
@@ -81,14 +81,14 @@
       <div class="flex items-center justify-between mb-2.5">
         <h2 class="text-sm font-bold text-slate-300">🚦 6대 자산 대표 신호등 <span class="text-xs font-normal text-slate-500">(카드를 누르면 세부 종목이 열립니다)</span></h2>
       </div>
-      <!-- 점수 기준 범례: 첫 화면에서 70/40점 기준을 바로 알 수 있게 -->
+      <!-- 점수 기준 범례: 첫 화면에서 80/40점 기준을 바로 알 수 있게 -->
       <div class="flex flex-wrap items-center gap-x-2.5 gap-y-1 mb-2.5 text-[11px] font-semibold">
         <span class="text-slate-500 font-normal">점수 기준</span>
-        <span class="text-emerald-400">70점↑ 지금 사요</span>
+        <span class="text-emerald-400">80점↑ 지금 사요</span>
         <span class="text-slate-600">·</span>
-        <span class="text-amber-400">40~69점 나눠 사요</span>
+        <span class="text-amber-400">40~79점 나눠 사요</span>
         <span class="text-slate-600">·</span>
-        <span class="text-rose-400">40점↓ 참아 봐요</span>
+        <span class="text-rose-400">40점 미만 참아 봐요</span>
         <span class="text-slate-500 font-normal">(100점 만점 · 카드 숫자는 카테고리 평균)</span>
       </div>
       <div id="category-grid" class="grid grid-cols-2 sm:grid-cols-3 gap-3"></div>
@@ -286,6 +286,7 @@
       </div>
 
       <p id="modal-comment" class="text-xs text-slate-300 bg-slate-800/70 p-3 rounded-xl leading-relaxed"></p>
+      <p class="text-[10px] text-slate-500">신호등 기준: <span class="text-emerald-400 font-bold">80점↑ 지금 사요</span> · <span class="text-amber-400 font-bold">40~79점 나눠 사요</span> · <span class="text-rose-400 font-bold">40점 미만 참아 봐요</span></p>
 
       <div class="space-y-2.5 text-xs">
         <div class="font-bold text-slate-300">📊 100점 만점 팩트 채점표</div>
@@ -298,12 +299,13 @@
           <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden"><div id="m-b2" class="bg-emerald-400 h-full"></div></div>
         </div>
         <div>
-          <div class="flex justify-between mb-1"><span>3. 금리·배당·박스권 매력도</span><span id="m-s3" class="font-bold"></span></div>
+          <div class="flex justify-between mb-1"><span>3. 1년 박스권 위치</span><span id="m-s3" class="font-bold"></span></div>
           <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden"><div id="m-b3" class="bg-indigo-400 h-full"></div></div>
         </div>
         <div>
-          <div class="flex justify-between mb-1"><span>4. 시장 공포 & 선물 펀딩비 심리</span><span id="m-s4" class="font-bold"></span></div>
+          <div class="flex justify-between mb-1"><span id="m-s4-label">4. 공포 심리 (자산군별)</span><span id="m-s4" class="font-bold"></span></div>
           <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden"><div id="m-b4" class="bg-amber-400 h-full"></div></div>
+          <p id="m-s4-basis" class="text-[10px] text-slate-500 mt-1"></p>
         </div>
       </div>
     </div>
@@ -313,6 +315,7 @@
     let currentPeriod = '1D';          // 전역 기간 상태: '1D' | '1W' (레이더·서랍·모달 공통)
     let selectedCatId = null;
     let greensOnly = false;            // '지금 사요!만 모아보기' 토글 상태
+    const GREEN_MIN = 80;             // 🟢 '지금 사요!' 커트라인(점) — 범례·필터·모달이 모두 이 값을 쒤니다
     let drawerMode = null;             // null | { kind: 'cat', catId } | { kind: 'greens' }
     let modalTicker = null;            // 모달에 열려 있는 종목
 
@@ -390,7 +393,7 @@
     }
 
     function getSignalInfo(score) {
-      if (score >= 70) return { label: "🟢 지금 사요!", cls: "bg-emerald-500/20 text-emerald-300 border-emerald-500/40", textCls: "text-emerald-400" };
+      if (score >= 80) return { label: "🟢 지금 사요!", cls: "bg-emerald-500/20 text-emerald-300 border-emerald-500/40", textCls: "text-emerald-400" };
       if (score >= 40) return { label: "🟡 나눠 사요", cls: "bg-amber-500/20 text-amber-300 border-amber-500/40", textCls: "text-amber-400" };
       return { label: "🔴 참아 봐요!", cls: "bg-rose-500/20 text-rose-300 border-rose-500/40", textCls: "text-rose-400" };
     }
@@ -529,22 +532,22 @@
       if (!appData) return;
       const grid = document.getElementById('category-grid');
       let html = '';
-      const cats = appData.categories.filter(cat => !greensOnly || cat.items.some(i => i.score >= 70));
+      const cats = appData.categories.filter(cat => !greensOnly || cat.items.some(i => i.score >= GREEN_MIN));
       cats.forEach(cat => {
         const avgScore = Math.round(cat.items.reduce((s, i) => s + i.score, 0) / cat.items.length);
         const sig = getSignalInfo(avgScore);
-        const greens = cat.items.filter(i => i.score >= 70).length;
+        const greens = cat.items.filter(i => i.score >= GREEN_MIN).length;
         const activeBorder = selectedCatId === cat.id ? 'border-sky-400 ring-2 ring-sky-400/30' : 'border-slate-800';
         html += `
           <button onclick="openCategory('${cat.id}')" class="card-hover bg-slate-900 border ${activeBorder} rounded-2xl p-4 text-left flex flex-col justify-between h-32">
-            <div class="text-sm font-bold text-slate-200">${cat.icon} ${cat.name}${greensOnly ? ` <span class="text-[10px] font-bold text-emerald-400" title="이 카테고리의 70점 이상(지금 사요) 종목 ${greens}개">🟢 ${greens}종목</span>` : ''}</div>
+            <div class="text-sm font-bold text-slate-200">${cat.icon} ${cat.name}${greensOnly ? ` <span class="text-[10px] font-bold text-emerald-400" title="이 카테고리의 80점 이상(지금 사요) 종목 ${greens}개">🟢 ${greens}종목</span>` : ''}</div>
             <div class="text-3xl font-extrabold ${sig.textCls} my-1">${avgScore}<span class="text-sm font-normal text-slate-400">점</span><span class="text-[10px] font-normal text-slate-500 ml-1">평균</span></div>
             <div><span class="text-xs font-extrabold px-2.5 py-1 rounded-full border ${sig.cls}">${sig.label}</span></div>
           </button>
         `;
       });
       if (!cats.length) {
-        html = `<div class="col-span-2 sm:col-span-3 bg-slate-900 border border-slate-800 rounded-2xl p-6 text-center text-xs text-slate-400">지금은 70점 이상인 자산이 없습니다. 전체 보기로 돌아가 점수를 확인해 보세요.</div>`;
+        html = `<div class="col-span-2 sm:col-span-3 bg-slate-900 border border-slate-800 rounded-2xl p-6 text-center text-xs text-slate-400">지금은 80점 이상인 자산이 없습니다. 전체 보기로 돌아가 점수를 확인해 보세요.</div>`;
       }
       grid.innerHTML = html;
 
@@ -552,8 +555,8 @@
       const status = document.getElementById('filter-status');
       if (status) {
         if (greensOnly) {
-          const greensCount = getAllItems().filter(i => i.score >= 70).length;
-          status.textContent = `필터 적용 중 — 70점 이상 종목이 있는 카테고리 ${cats.length}개 (전체 ${appData.categories.length}개) · 해당 종목 ${greensCount}개 · 🟢 N = 해당 카테고리 70점↑ 종목 수`;
+          const greensCount = getAllItems().filter(i => i.score >= GREEN_MIN).length;
+          status.textContent = `필터 적용 중 — 80점 이상 종목이 있는 카테고리 ${cats.length}개 (전체 ${appData.categories.length}개) · 해당 종목 ${greensCount}개 · 🟢 N = 해당 카테고리 80점↑ 종목 수`;
           status.classList.remove('hidden');
         } else {
           status.classList.add('hidden');
@@ -627,8 +630,8 @@
       let items = [];
       let title = '';
       if (drawerMode.kind === 'greens') {
-        items = getAllItems().filter(i => i.score >= 70).sort((a, b) => b.score - a.score);
-        title = `🟢 전 자산 '지금 사요!' (70점 이상) ${items.length}종목`;
+        items = getAllItems().filter(i => i.score >= GREEN_MIN).sort((a, b) => b.score - a.score);
+        title = `🟢 전 자산 '지금 사요!' (80점 이상) ${items.length}종목`;
       } else if (drawerMode.kind === 'movers') {
         const key = currentPeriod === '1D' ? 'chg1d' : 'chg1w';
         items = getAllItems().sort((a, b) => b[key] - a[key]);
@@ -764,8 +767,10 @@
       document.getElementById('m-b2').style.width = `${(it.s2/30)*100}%`;
       document.getElementById('m-s3').textContent = `${it.s3} / 20점`;
       document.getElementById('m-b3').style.width = `${(it.s3/20)*100}%`;
+      document.getElementById('m-s4-label').textContent = `4. 공포 심리 — ${it.s4Label || '자산군별 기준'}`;
       document.getElementById('m-s4').textContent = `${it.s4} / 15점`;
       document.getElementById('m-b4').style.width = `${(it.s4/15)*100}%`;
+      document.getElementById('m-s4-basis').textContent = it.s4Basis || '자산군에 맞는 공포 지표로 계산합니다.';
     }
 
     function closeModal() {
