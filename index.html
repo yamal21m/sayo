@@ -6,7 +6,7 @@
   <title>SAYO (사요) — 그래서 지금 사요?</title>
   <!-- Tailwind CSS 는 빌드 타임에 style.css 로 미리 컴파일해 둡니다(CDN JS 제거 → 렌더 블로킹 없음).
        다시 만들 때: npx tailwindcss -c tailwind.config.js -i tw-input.css -o style.css --minify -->
-  <link rel="preload" href="./data.json" as="fetch" crossorigin="anonymous" />
+  <link rel="preload" href="./data.json" as="fetch" />
   <link rel="stylesheet" href="./style.css" />
   <!-- PWA: 홈 화면/데스크톱에 앱으로 설치 -->
   <link rel="manifest" href="/manifest.webmanifest" />
@@ -147,8 +147,8 @@
         </button>
         <div class="seg" role="tablist" aria-label="등락률 기간 선택">
           <span class="seg-pill" id="period-pill" aria-hidden="true"></span>
-          <button type="button" id="btn-1d" role="tab" aria-selected="true" onclick="setPeriod('1D')" class="seg-btn is-active">오늘(1D)</button>
-          <button type="button" id="btn-1w" role="tab" aria-selected="false" onclick="setPeriod('1W')" class="seg-btn">이번 주(1W)</button>
+          <button type="button" id="btn-1d" role="tab" aria-selected="true" aria-controls="mover-pills" onclick="setPeriod('1D')" class="seg-btn is-active">오늘(1D)</button>
+          <button type="button" id="btn-1w" role="tab" aria-selected="false" aria-controls="mover-pills" onclick="setPeriod('1W')" class="seg-btn">이번 주(1W)</button>
         </div>
       </div>
       <div class="flex flex-wrap items-center gap-2 text-xs" id="mover-pills"></div>
@@ -412,6 +412,19 @@
     let appData = null;
     let dataState = 'loading'; // loading | ready | error
 
+    // ── 문자열·수치 안전 도우미 ─────────────────────────────────────────
+    //  data.json 값은 자동 파이프라인 산출물이지만, HTML 로 넣기 전에는 항상 이스케이프합니다.
+    function esc(v) {
+      return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+      });
+    }
+    function escAttr(v) { return esc(v); }
+    function num(v, fallback) {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : fallback;
+    }
+
     const CATEGORY_SHELL = [
       { id: 'bonds', icon: '💵', name: '채권 · 환율' },
       { id: 'metals', icon: '🥈', name: '귀금속 (금·은)' },
@@ -542,14 +555,14 @@
       const top = document.getElementById('top-summary');
       if (top) top.innerHTML = '<span class="text-rose-300 font-bold">시세 데이터를 불러오지 못했습니다.</span> <span class="text-slate-400">잠시 후 새로고침해 주세요.</span>';
       const pills = document.getElementById('mover-pills');
-      if (pills) pills.innerHTML = '<button onclick="retryLoad()" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 px-3 py-1 rounded-full font-bold transition">🔄 다시 불러오기</button>';
+      if (pills) pills.innerHTML = '<button type="button" data-retry="1" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 px-3 py-1 rounded-full font-bold transition">🔄 다시 불러오기</button>';
       const grid = document.getElementById('category-grid');
       if (grid) {
         grid.innerHTML = `
           <div class="col-span-2 sm:col-span-3 bg-slate-900 border border-rose-500/40 rounded-2xl p-6 text-center">
             <div class="text-sm font-bold text-rose-300 mb-1">시세 데이터( data.json )를 받지 못했습니다</div>
             <p class="text-xs text-slate-400">자동 갱신은 하루 3번(07·16·23시 KST) 돌고 있습니다. 잠시 뒤 다시 열어 주세요.</p>
-            <button onclick="retryLoad()" class="mt-3 text-xs font-bold bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 px-3 py-1.5 rounded-lg">다시 불러오기</button>
+            <button type="button" data-retry="1" class="mt-3 text-xs font-bold bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 px-3 py-1.5 rounded-lg">다시 불러오기</button>
           </div>`;
       }
       const ratios = document.getElementById('ratios-list');
@@ -586,9 +599,12 @@
 
     // 스냅샷이 4시간 이상 지났으면 '· N시간 전' (하루를 넘으면 'N일 M시간 전'), 아니면 null
     function snapshotAgeText(raw) {
-      const ts = parseUpdatedAt(raw);
+      // data.json 이 epoch ms(updatedAtTs)를 주면 그 값을 우선 — 기기 시계 오차는 9시간 고정 보정으로 완화합니다.
+      let ts = appData && Number.isFinite(Number(appData.updatedAtTs)) ? Number(appData.updatedAtTs) : parseUpdatedAt(raw);
       if (ts == null) return null;
-      const hours = Math.floor((Date.now() - ts) / 3600000);
+      let hours = Math.floor((Date.now() - ts) / 3600000);
+      if (!Number.isFinite(hours)) return null;
+      hours = Math.max(0, Math.min(hours, 24 * 365));   // 음수·과대 값 클램프
       if (hours < 4) return null;
       if (hours >= 24) return '· ' + Math.floor(hours / 24) + '일 ' + (hours % 24) + '시간 전';
       return '· ' + hours + '시간 전';
@@ -611,7 +627,7 @@
     function asofLabel(asof, suffix) {
       if (asof == null || asof === '') return '기준일 미상';
       const m = String(asof).match(/^(\d{4})-(\d{2})-(\d{2})/);
-      if (!m) return String(asof) + (suffix || '');
+      if (!m) return '기준일 미상';   // 낯선 형식은 원문을 그대로 붙이지 않고 통일
       return Number(m[2]) + '/' + Number(m[3]) + (suffix === false ? '' : ' 종가');
     }
 
@@ -646,11 +662,19 @@
         footerUpdated.textContent = clock ? clock + ' 기준' : updatedText;
       }
 
-      // 최상단 TOP 2 저평가 자산 자동 추출
+      // 최상단 TOP 2 저평가 자산 자동 추출 (받은 종목이 1개뿐이어도 문구가 로딩 상태로 남지 않게)
       const sortedByScore = getAllItems().sort((a, b) => b.score - a.score);
-      if (sortedByScore.length >= 2) {
-        document.getElementById('top-summary').innerHTML =
-          `오늘 가장 싼 자산: <span class="text-emerald-400 font-extrabold">${sortedByScore[0].name}(${sortedByScore[0].score}점)</span> · <span class="text-emerald-400 font-extrabold">${sortedByScore[1].name}(${sortedByScore[1].score}점)</span>`;
+      const topEl = document.getElementById('top-summary');
+      if (topEl) {
+        if (sortedByScore.length >= 2) {
+          topEl.innerHTML =
+            `오늘 가장 싼 자산: <span class="text-emerald-400 font-extrabold">${esc(sortedByScore[0].name)}(${esc(sortedByScore[0].score)}점)</span> · <span class="text-emerald-400 font-extrabold">${esc(sortedByScore[1].name)}(${esc(sortedByScore[1].score)}점)</span>`;
+        } else if (sortedByScore.length === 1) {
+          topEl.innerHTML =
+            `오늘 가장 싼 자산: <span class="text-emerald-400 font-extrabold">${esc(sortedByScore[0].name)}(${esc(sortedByScore[0].score)}점)</span>`;
+        } else {
+          topEl.innerHTML = '<span class="text-amber-300 font-bold">지금은 표시할 종목 데이터가 없습니다.</span>';
+        }
       }
 
       renderMovers();
@@ -695,13 +719,13 @@
 
       let html = `<span class="font-bold text-sky-400 mr-1">💧 ${word} 세일 속보:</span>`;
       drops.forEach(d => {
-        html += `<button onclick="openModal('${d.ticker}')" class="bg-sky-950/80 hover:bg-sky-900 border border-sky-500/40 text-sky-200 px-2.5 py-1 rounded-full font-semibold transition">${d.ticker} ${d[key]}% <span class="text-sky-300/70 font-normal">· ${d.score}점</span></button>`;
+        html += `<button type="button" data-ticker="${escAttr(d.ticker)}" class="bg-sky-950/80 hover:bg-sky-900 border border-sky-500/40 text-sky-200 px-2.5 py-1 rounded-full font-semibold transition">${esc(d.ticker)} ${esc(d[key])}% <span class="text-sky-300/70 font-normal">· ${esc(d.score)}점</span></button>`;
       });
       // 등락만으로 '과열'을 단정하지 않습니다 (점수와 모순되던 문구 수정). 라벨 + 점수 병기.
       html += `<span class="font-bold text-rose-400 ml-2 mr-1">🔥 ${word} 상승 상위:</span>`;
       rises.forEach(r => {
         const sign = r[key] > 0 ? '+' : '';
-        html += `<button onclick="openModal('${r.ticker}')" class="bg-rose-950/80 hover:bg-rose-900 border border-rose-500/40 text-rose-200 px-2.5 py-1 rounded-full font-semibold transition">${r.ticker} ${sign}${r[key]}% <span class="text-rose-300/70 font-normal">· ${r.score}점</span></button>`;
+        html += `<button type="button" data-ticker="${escAttr(r.ticker)}" class="bg-rose-950/80 hover:bg-rose-900 border border-rose-500/40 text-rose-200 px-2.5 py-1 rounded-full font-semibold transition">${esc(r.ticker)} ${sign}${esc(r[key])}% <span class="text-rose-300/70 font-normal">· ${esc(r.score)}점</span></button>`;
       });
       html += `<span class="text-[10px] text-slate-500 self-center">등락률 순위(점수와 별개) · 점수는 100점 만점 매수 매력도</span>`;
       document.getElementById('mover-pills').innerHTML = html;
@@ -715,13 +739,15 @@
       let html = '';
       const cats = appData.categories.filter(cat => !greensOnly || cat.items.some(i => i.score >= GREEN_MIN));
       cats.forEach(cat => {
-        const avgScore = Math.round(cat.items.reduce((s, i) => s + i.score, 0) / cat.items.length);
+        const avgScore = cat.items.length
+          ? Math.round(cat.items.reduce((s, i) => s + i.score, 0) / cat.items.length)
+          : 0;
         const sig = getSignalInfo(avgScore);
         const greens = cat.items.filter(i => i.score >= GREEN_MIN).length;
         const activeBorder = selectedCatId === cat.id ? 'border-sky-400 ring-2 ring-sky-400/30' : 'border-slate-800';
         html += `
-          <button onclick="openCategory('${cat.id}')" class="spot card-hover bg-slate-900 border ${activeBorder} rounded-2xl p-4 text-left flex flex-col justify-between h-32">
-            <div class="text-sm font-bold text-slate-200">${cat.icon} ${cat.name}${greensOnly ? ` <span class="text-[10px] font-bold text-emerald-400" title="이 카테고리의 80점 이상(지금 사요) 종목 ${greens}개">🟢 ${greens}종목</span>` : ''}</div>
+          <button type="button" data-cat-id="${escAttr(cat.id)}" class="spot card-hover bg-slate-900 border ${activeBorder} rounded-2xl p-4 text-left flex flex-col justify-between h-32">
+            <div class="text-sm font-bold text-slate-200"><span aria-hidden="true">${esc(cat.icon)}</span> ${esc(cat.name)}${greensOnly ? ` <span class="text-[10px] font-bold text-emerald-400" title="이 카테고리의 80점 이상(지금 사요) 종목 ${greens}개">🟢 ${greens}종목</span>` : ''}</div>
             <div class="text-3xl font-extrabold ${sig.textCls} my-1"><span class="cat-score" data-roll data-cat="${cat.id}" data-score="${avgScore}">0</span><span class="text-sm font-normal text-slate-400">점</span><span class="text-[10px] font-normal text-slate-500 ml-1">평균</span></div>
             <div><span class="text-xs font-extrabold px-2.5 py-1 rounded-full border ${sig.cls}">${sig.label}</span></div>
           </button>
@@ -867,7 +893,7 @@
         items = cat.items;
         title = `${cat.icon} ${cat.name} 세부 종목`;
       }
-      document.getElementById('drawer-title').innerHTML = title + ' ' + periodBadge;
+      document.getElementById('drawer-title').innerHTML = esc(title) + ' ' + periodBadge;
       const note = document.getElementById('drawer-note');
       if (note) {
         const word = currentPeriod === '1D' ? '오늘' : '이번 주';
@@ -888,18 +914,18 @@
         const sign = chg > 0 ? '+' : '';
         const rank = withRank ? `<span class="text-[10px] font-bold text-slate-500 mr-1">${idx + 1}.</span>` : '';
         html += `
-          <div onclick="openModal('${it.ticker}')" class="cursor-pointer bg-slate-950/70 hover:bg-slate-800/80 border border-slate-800 rounded-xl px-3.5 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 sm:gap-2 transition">
+          <button type="button" data-ticker="${escAttr(it.ticker)}" class="w-full text-left cursor-pointer bg-slate-950/70 hover:bg-slate-800/80 border border-slate-800 rounded-xl px-3.5 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 sm:gap-2 transition">
             <div class="min-w-0 sm:flex-1">
-              <div class="truncate">${rank}<span class="font-extrabold text-white text-sm">${it.ticker}</span><span class="text-xs text-slate-400 ml-1.5">${it.name}</span></div>
+              <div class="truncate">${rank}<span class="font-extrabold text-white text-sm">${esc(it.ticker)}</span><span class="text-xs text-slate-400 ml-1.5">${esc(it.name)}</span></div>
               <div class="text-[10px] text-slate-500 mt-0.5">${priceBasisLabel(it)}<span class="text-slate-600"> · </span>등락 ${currentPeriod}</div>
             </div>
             <div class="flex items-center justify-between sm:justify-end gap-2 sm:gap-3 shrink-0 w-full sm:w-auto">
-              <span class="text-xs text-slate-300 whitespace-nowrap">${it.price}</span>
+              <span class="text-xs text-slate-300 whitespace-nowrap">${esc(it.price)}</span>
               <span class="text-xs font-bold ${chgColor} whitespace-nowrap">${sign}${chg}%<span class="ml-1 text-[9px] font-extrabold px-1 py-0.5 rounded bg-slate-800 text-slate-400 align-middle">${currentPeriod}</span></span>
-              <span class="text-sm font-extrabold ${sig.textCls} whitespace-nowrap">${it.score}점</span>
+              <span class="text-sm font-extrabold ${sig.textCls} whitespace-nowrap">${esc(it.score)}점</span>
               <span class="text-xs font-bold px-2.5 py-1 rounded-full border whitespace-nowrap ${sig.cls}">${sig.label}</span>
             </div>
-          </div>
+          </button>
         `;
       });
       return html;
@@ -936,23 +962,24 @@
         return;
       }
       list.innerHTML = appData.ratios.map(r => {
-        const pct = Math.max(50, Math.min(95, Number(r.pct) || 50));
+        // pct 는 우위 퍼센트(50~100) — 문구와 막대가 같은 산식이 되도록 0~100 으로만 잘라 쓥니다
+        const pct = Math.max(0, Math.min(100, num(r.pct, 50)));
         const tone = ratioTone(pct);
         const leftWins = r.winnerSide === 'left';
-        // 중앙(50%)에서 우세 쪽으로 얼마나 쏠리는지: 우위 강도만큼 반쪽 트랙을 채움
-        const fill = Math.max(4, ((pct - 50) / 45) * 50).toFixed(1);
+        // 중앙(50%)에서 우세 쪽으로 얼마나 쏠리는지: 우위 강도만큼 반쪽 트랙을 채움 (트랙 밖으로 넘지 않게)
+        const fill = Math.max(4, Math.min(50, ((pct - 50) / 45) * 50)).toFixed(1);
         return `
           <div class="spot bg-slate-950/60 border border-slate-800/80 rounded-xl p-3">
             <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 mb-2">
-              <span class="text-[11px] font-bold truncate ${leftWins ? tone.text : 'text-slate-500'}">${r.left}</span>
-              <span class="text-[10px] font-extrabold px-1.5 py-0.5 rounded-full border whitespace-nowrap ${tone.badge}">${r.winner}</span>
-              <span class="text-[11px] font-bold truncate text-right ${leftWins ? 'text-slate-500' : tone.text}">${r.right}</span>
+              <span class="text-[11px] font-bold truncate ${leftWins ? tone.text : 'text-slate-500'}">${esc(r.left)}</span>
+              <span class="text-[10px] font-extrabold px-1.5 py-0.5 rounded-full border whitespace-nowrap ${tone.badge}">${esc(r.winner)}</span>
+              <span class="text-[11px] font-bold truncate text-right ${leftWins ? 'text-slate-500' : tone.text}">${esc(r.right)}</span>
             </div>
             <div class="relative h-2.5 rounded-full bg-slate-800/90 overflow-hidden">
               <div class="absolute inset-y-0 left-1/2 w-px bg-slate-600"></div>
               <div class="absolute inset-y-0 rounded-full ${tone.bar} ratio-fill" data-fill="${fill}" style="${leftWins ? 'right:50%' : 'left:50%'};width:0%"></div>
             </div>
-            <p class="text-[11px] text-slate-400 mt-1.5 leading-snug">${r.desc}</p>
+            <p class="text-[11px] text-slate-400 mt-1.5 leading-snug">${esc(r.desc)}</p>
           </div>
         `;
       }).join('');
@@ -972,11 +999,20 @@
     function openModal(ticker) {
       modalTicker = ticker;
       const el = document.getElementById('score-modal');
+      modalFocusBefore = document.activeElement;
+      el.setAttribute('role', 'dialog');
+      el.setAttribute('aria-modal', 'true');
+      el.setAttribute('aria-labelledby', 'modal-name');
       el.classList.add('is-open');
       el.setAttribute('aria-hidden', 'false');
       el.scrollTop = 0;
+      document.body.style.overflow = 'hidden';   // 배경 스크롤 잠금
       renderModal(ticker);
+      const first = el.querySelector('button, [href], [tabindex]:not([tabindex="-1"])');
+      if (first) first.focus({ preventScroll: true });
     }
+
+    let modalFocusBefore = null;
 
     // ─────────────────────────────────────────────────────────────
     // #154 역량을 포개는 다각형 — 4축(200일선·고점할인·RSI·1년박스·공포심리) 다이아몬드 레이더
@@ -1085,8 +1121,8 @@
       document.getElementById('modal-cat').textContent = `${it.catIcon} ${it.catName}`;
       document.getElementById('modal-name').textContent = `${it.ticker} — ${it.name}`;
       document.getElementById('modal-price').innerHTML =
-        `현재가: ${it.price} · <span class="${dayCls}">오늘 ${fmtChg(it.chg1d)}</span> / <span class="${weekCls}">주간 ${fmtChg(it.chg1w)}</span>`
-        + `\n<span class="block text-slate-500">${priceBasisLabel(it)} · 점수는 100점 만점 매수 매력도</span>`;
+        `현재가: ${esc(it.price)} · <span class="${dayCls}">오늘 ${esc(fmtChg(it.chg1d))}</span> / <span class="${weekCls}">주간 ${esc(fmtChg(it.chg1w))}</span>`
+        + `\n<span class="block text-slate-500">${esc(priceBasisLabel(it))} · 점수는 100점 만점 매수 매력도</span>`;
       document.getElementById('modal-score').className = `text-2xl font-extrabold ${sig.textCls}`;
       rollNumber(document.getElementById('modal-score'), it.score, { format: v => Math.round(v) + '점' });
       document.getElementById('modal-signal').textContent = sig.label;
@@ -1118,20 +1154,60 @@
       el.classList.remove('is-open');
       el.setAttribute('aria-hidden', 'true');
       modalTicker = null;
+      document.body.style.overflow = '';
+      // 모달을 연 버튼으로 초점을 돌려놓습니다 (키보드 사용자)
+      if (modalFocusBefore && typeof modalFocusBefore.focus === 'function' && document.contains(modalFocusBefore)) {
+        modalFocusBefore.focus({ preventScroll: true });
+      }
+      modalFocusBefore = null;
     }
 
     // 외부 자동 업데이트 파일(data.json)을 받은 뒤에만 화면을 그립니다.
     //   받기 전에는 스켈레톤만 보여 주고, 숫자는 절대 지어내지 않습니다.
-    const DATA_TIMEOUT_MS = 8000;
+    const DATA_TIMEOUT_MS = 4000;          // 첫 시도는 짧게
+    const DATA_RETRY_TIMEOUT_MS = 6000;    // 재시도는 조금 길게 (기존 8초×2 → 4초+6초로 단축)
 
-    async function fetchDataOnce() {
+    // 받은 data.json 을 화면이 기대는 모양으로 정리합니다.
+    //   종목이 깨져 있거나 score 가 없는 카테고리가 하나라도 있으면 renderAll 전체가 예외로 멈추던 문제를 막습니다.
+    function normalizeData(json) {
+      const rawCats = Array.isArray(json && json.categories) ? json.categories : [];
+      const cats = [];
+      let droppedItems = 0;
+      rawCats.forEach(function (c, ci) {
+        if (!c || typeof c !== 'object') return;
+        const rawItems = Array.isArray(c.items) ? c.items : [];
+        const items = [];
+        rawItems.forEach(function (it) {
+          if (!it || typeof it !== 'object' || it.ticker == null) { droppedItems++; return; }
+          const score = Number(it.score);
+          if (!Number.isFinite(score)) { droppedItems++; return; }   // 점수 없는 종목은 'NaN점' 대신 제외
+          items.push(Object.assign({}, it, {
+            ticker: String(it.ticker),
+            name: it.name == null ? String(it.ticker) : String(it.name),
+            score: score,
+            chg1d: num(it.chg1d, 0),
+            chg1w: num(it.chg1w, 0)
+          }));
+        });
+        if (!items.length) return;
+        cats.push(Object.assign({}, c, {
+          id: c.id == null ? 'cat-' + ci : String(c.id),
+          name: c.name == null ? '이름 없는 카테고리' : String(c.name),
+          icon: c.icon == null ? '' : String(c.icon),
+          items: items
+        }));
+      });
+      return Object.assign({}, json, { categories: cats, _droppedItems: droppedItems });
+    }
+
+    async function fetchDataOnce(timeoutMs) {
       const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), DATA_TIMEOUT_MS);
+      const timer = setTimeout(function () { ctrl.abort(); }, timeoutMs || DATA_TIMEOUT_MS);
       try {
         const res = await fetch('./data.json', { signal: ctrl.signal, cache: 'no-store' });
         if (!res.ok) throw new Error('HTTP ' + res.status);
-        const json = await res.json();
-        if (!json || !Array.isArray(json.categories) || !json.categories.length) throw new Error('empty data');
+        const json = normalizeData(await res.json());
+        if (!json.categories.length) throw new Error('empty data');
         return json;
       } finally {
         clearTimeout(timer);
@@ -1147,7 +1223,7 @@
     async function loadData() {
       for (let attempt = 1; attempt <= 2; attempt++) {
         try {
-          appData = await fetchDataOnce();
+          appData = await fetchDataOnce(attempt === 1 ? DATA_TIMEOUT_MS : DATA_RETRY_TIMEOUT_MS);
           dataState = 'ready';
           dataFetchedAt = Date.now();
           renderAll();
@@ -1181,8 +1257,18 @@
     }
 
     function retryLoad() {
+      // 이미 화면에 보고 있던 값이 있으면, 재시도 실패 시 그 화면을 유지합니다 (스켈레톤으로 돌아가지 않음)
+      if (dataState === 'ready') {
+        return fetchDataOnce(DATA_RETRY_TIMEOUT_MS).then(function (json) {
+          appData = json;
+          dataFetchedAt = Date.now();
+          renderAll();
+          if (drawerMode) renderDrawer();
+          if (modalTicker && isModalOpen()) renderModal(modalTicker);
+        }).catch(function () { /* 기존 화면·스냅샷 시각을 그대로 둡니다 */ });
+      }
       renderLoading();
-      loadData();
+      return loadData();
     }
 
     // 방문자 수 카운터 (오늘 / 누적) — countapi.mileshilliard.com (무료·무가입·CORS)
@@ -1262,6 +1348,13 @@
 
       paintVisitor(today, total);
 
+      // 카운터 API 가 죽어 저장값도 없으면 '—' 를 남기지 않고 방문자 줄을 숨깁니다
+      const stats = document.getElementById('visitor-stats');
+      if (stats) {
+        if (total === null && today === null && !cache) stats.classList.add('hidden');
+        else stats.classList.remove('hidden');
+      }
+
       // 2) 성공한 값만 저장하고, 총 네트워크 실패에서는 저장값을 그대로 유지합니다.
       if (total !== null || today !== null) {
         const prev = cache || {};
@@ -1308,10 +1401,13 @@
     let fngRefreshedAt = null;         // 크립토 공탐을 마지막으로 성공해서 받아온 시각
     let marketTried = false;
     let marketTimer = null;
+    let marketInFlight = false;    // 겹친 회차가 늦게 도착해 새 값을 덮어쓰지 않게
+    let marketFailStreak = 0;      // 연속 실패 횟수 — 실패가 길어지면 5분씩 쉬며 외부 API를 두들기지 않도록
+    let marketLastTry = 0;
 
     function jsonWithTimeout(url, ms) {
       const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), ms || 6000);
+      const timer = setTimeout(() => ctrl.abort(), ms || 4000);
       return fetch(url, { signal: ctrl.signal, cache: 'no-store' })
         .then(res => { if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
         .finally(() => clearTimeout(timer));
@@ -1438,7 +1534,7 @@
             const s = Math.max(0, Math.min(100, Number(c.score)));
             const t = fngTone(s);
             return '<div class="flex items-center gap-2">'
-              + '<span class="text-[11px] text-slate-400 w-[8.5rem] truncate">' + c.name + ' </span>'
+              + '<span class="text-[11px] text-slate-400 w-[8.5rem] truncate">' + esc(c.name) + ' </span>'
               + '<div class="flex-1 bg-slate-800 h-1.5 rounded-full overflow-hidden"><div class="fill-bar h-full rounded-full ' + fngBarColor(s) + '" data-fill="' + s + '" style="width:0"></div></div>'
               + '<span class="text-[11px] font-bold ' + t.text + ' w-7 text-right">' + Math.round(s) + '</span>'
               + '</div>';
@@ -1465,7 +1561,8 @@
         badge.textContent = '집계 불가';
         badge.className = 'text-[11px] font-extrabold px-2 py-0.5 mb-0.5 rounded-full border border-slate-700 text-slate-400 ml-auto';
         marker.style.left = '50%';
-        if (live) live.textContent = '대기 중';
+        if (live) live.textContent = '데이터 없음';
+        if (detail) detail.textContent = '';   // 어제 문장이 숫자 '—' 밑에 남지 않게
         return;
       }
 
@@ -1558,6 +1655,7 @@
         kPct.className = 'text-3xl font-extrabold leading-none text-slate-400';
         kBadge.textContent = marketTried ? '집계 불가' : '대조 중';
         kBadge.className = 'text-[11px] font-extrabold px-2 py-0.5 mb-0.5 rounded-full border border-slate-700 text-slate-400';
+        kMarker.style.left = '50%';   // 어제 위치의 마커가 남지 않게 초기화
         kDetail.textContent = marketTried
           ? '시세를 불러오지 못했어요. 잠시 후 새로고침해 주세요.'
           : '업비트·해외 시세·환율을 대조하는 중입니다.';
@@ -1585,11 +1683,24 @@
         fValue.className = 'text-4xl font-extrabold leading-none text-slate-400';
         fBadge.textContent = marketTried ? '집계 불가' : '대조 중';
         fBadge.className = 'text-[11px] font-extrabold px-2 py-0.5 mb-1 rounded-full border border-slate-700 text-slate-400 ml-auto';
+        fMarker.style.left = '50%';   // 어제 위치의 마커가 남지 않게 초기화
         fLive.textContent = marketTried ? '연결 실패' : '불러오는 중…';
       }
     }
 
-    async function refreshMarket() {
+    async function refreshMarket(force) {
+      if (marketInFlight) return;   // 60초 폴링·탭 복귀가 겹쳐도 한 번만 돕니다
+      if (!force && marketFailStreak >= 2 && Date.now() - marketLastTry < 5 * 60 * 1000) return;
+      marketInFlight = true;
+      marketLastTry = Date.now();
+      try {
+        await refreshMarketOnce();
+      } finally {
+        marketInFlight = false;
+      }
+    }
+
+    async function refreshMarketOnce() {
       const [upbit, overseas, fx, fngRaw] = await Promise.all([
         firstOk([UPBIT_BTC]),
         firstOk(OVERSEAS_BTC),
@@ -1625,19 +1736,20 @@
       if (gotKimchi || gotFng) marketRefreshedAt = Date.now();
       marketTried = true;
       if (marketState.kimchi || marketState.fng) saveMarketCache();
+      marketFailStreak = (gotKimchi || gotFng) ? 0 : marketFailStreak + 1;
       renderMarket();
     }
 
     // 1분마다 자동 갱신 (탭이 다시 보일 때도 즉시 한 번)
-    refreshMarket();
+    refreshMarket(true);
     marketTimer = setInterval(() => {
       if (document.hidden) return;
-      refreshMarket();
+      refreshMarket(false);
       renderSnapshotAge();   // 탭을 열어 둔 사이에도 'N시간 전' 배지가 사실과 어긋나지 않게
     }, 60000);
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) return;
-      refreshMarket();
+      refreshMarket(true);
       reloadDataIfStale();
       renderSnapshotAge();
     });
@@ -1646,23 +1758,96 @@
     renderLoading();
     loadData();
 
+    // ── 위임 클릭 핸들러 ─────────────────────────────────────────────
+    //  종목 코드·카테고리 id 같은 데이터 문자열을 onclick 문자열로 보간하지 않고 data 속성으로 넘깁니다.
+    function onDelegatedClick(e) {
+      const t = e.target.closest && e.target.closest('[data-ticker]');
+      if (t) { openModal(t.dataset.ticker); return; }
+      const c = e.target.closest && e.target.closest('[data-cat-id]');
+      if (c) { openCategory(c.dataset.catId); return; }
+      const r = e.target.closest && e.target.closest('[data-retry]');
+      if (r) retryLoad();
+    }
+    ['category-grid', 'mover-pills', 'drawer-list'].forEach(function (id) {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('click', onDelegatedClick);
+    });
+
+    // WAI-ARIA 탭: 방향키로 1D/1W 전환
+    const tablist = document.querySelector('.seg[role="tablist"]');
+    if (tablist) tablist.addEventListener('keydown', function (e) {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      e.preventDefault();
+      setPeriod(currentPeriod === '1D' ? '1W' : '1D');
+      const next = document.getElementById(currentPeriod === '1D' ? 'btn-1d' : 'btn-1w');
+      if (next) next.focus();
+    });
+
     // #039 알약 인디케이터 첫 위치/창 크기 변경 추적
     movePeriodPill();
     window.addEventListener('resize', movePeriodPill);
     window.addEventListener('load', movePeriodPill);
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(movePeriodPill).catch(function () {});
 
-    // Esc 로 모달 닫기 (키보드 사용자)
+    // Esc 로 모달 닫기 + 모달 안에서 Tab 이 배경으로 빠지지 않게 (키보드 사용자)
     document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape' && isModalOpen()) closeModal();
+      if (!isModalOpen()) return;
+      if (e.key === 'Escape') { closeModal(); return; }
+      if (e.key !== 'Tab') return;
+      const el = document.getElementById('score-modal');
+      const focusables = el.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+      if (!focusables.length) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (!el.contains(document.activeElement)) { first.focus(); e.preventDefault(); return; }
+      if (e.shiftKey && document.activeElement === first) { last.focus(); e.preventDefault(); }
+      else if (!e.shiftKey && document.activeElement === last) { first.focus(); e.preventDefault(); }
     });
   </script>
 
-  <!-- PWA 서비스 워커 등록: 오프라인에서도 앱 셸과 직전 시세로 열린다 -->
+  <!-- PWA 서비스 워커 등록: 오프라인에서도 앱 셸과 직전 시세로 열린다
+       새 버전은 설치만 해 두고 기다렸다가, 준비되면 배너로 알려 사용자가 고릅니다. -->
   <script>
     if ('serviceWorker' in navigator) {
+      let refreshing = false;
+      navigator.serviceWorker.addEventListener('controllerchange', function () {
+        if (refreshing) return;
+        refreshing = true;
+        location.reload();
+      });
+
+      function showUpdateBanner(reg) {
+        if (document.getElementById('sw-update-banner')) return;
+        const bar = document.createElement('div');
+        bar.id = 'sw-update-banner';
+        bar.setAttribute('role', 'status');
+        bar.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:16px;z-index:60;display:flex;align-items:center;gap:8px;background:#0f172a;color:#e2e8f0;border:1px solid #38bdf8;border-radius:12px;padding:8px 12px;font-size:12px;font-weight:700;box-shadow:0 8px 24px rgba(0,0,0,.4)';
+        const msg = document.createElement('span');
+        msg.textContent = '새 버전이 준비됐어요.';
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = '새로고침';
+        btn.style.cssText = 'background:#0ea5e9;color:#020617;border:0;border-radius:8px;padding:4px 10px;font-weight:800;font-size:12px;cursor:pointer';
+        btn.addEventListener('click', function () {
+          if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+          else location.reload();
+        });
+        bar.appendChild(msg);
+        bar.appendChild(btn);
+        document.body.appendChild(bar);
+      }
+
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').catch(() => { /* 등록 실패해도 웹 화면은 그대로 동작 */ });
+        navigator.serviceWorker.register('/sw.js').then(function (reg) {
+          if (reg.waiting && navigator.serviceWorker.controller) showUpdateBanner(reg);
+          reg.addEventListener('updatefound', function () {
+            const nw = reg.installing;
+            if (!nw) return;
+            nw.addEventListener('statechange', function () {
+              if (nw.state === 'installed' && navigator.serviceWorker.controller) showUpdateBanner(reg);
+            });
+          });
+        }).catch(() => { /* 등록 실패해도 웹 화면은 그대로 동작 */ });
       });
     }
   </script>

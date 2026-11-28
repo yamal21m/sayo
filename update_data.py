@@ -1245,6 +1245,9 @@ def main():
 
   output = {
       "updatedAt": now_str,
+      # 클라이언트가 기기 시계·문자열 포맷에 덜 의존하도록 epoch(ms)·ISO 도 같이 남깁니다.
+      "updatedAtTs": int(datetime.now(KST).timestamp() * 1000),
+      "updatedAtISO": datetime.now(KST).isoformat(timespec="seconds"),
       "categories": categories,
       "ratios": ratios,
       "market": market,

@@ -3,7 +3,7 @@
  *  · 오프라인: 캐시된 앱 셸 + 직전에 받아 둔 data.json 으로 화면이 열림
  *  · 교차 출처(업비트·코인베이스·공포탐욕·카운터·환율)는 캐시하지 않고 네트워크 직통
  */
-const CACHE_NAME = 'sayo-shell-v2'; // v2: Lucian UI 고도화(039·228·098·154) 반영 — 기존 설치본도 새 셸로 교체
+const CACHE_NAME = 'sayo-shell-v3'; // v3: 업데이트 배너 + skipWaiting 지연(열린 화면 보호) + CSP/헤더 정리
 
 const SHELL_URLS = [
   '/',
@@ -27,8 +27,15 @@ self.addEventListener('install', (event) => {
         if (res && res.ok) await cache.put(url, res.clone());
       } catch (e) { /* 오프라인이면 다음 기회에 */ }
     }));
-    await self.skipWaiting();
+    // 새 버전은 여기서 바로 활성화하지 않습니다. 이미 열려 있는 화면이 옛 style.css/index.html 을
+    // 참조하는 도중에 캐시가 바뀌면 화면 일부가 깨질 수 있어, 사용자가 배너에서 '새로고침'을
+    // 누를 때(SKIP_WAITING 메시지)만 활성화합니다.
   })());
+});
+
+// 페이지의 '새 버전이 준비됐어요 → 새로고침' 버튼이 보내는 신호
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
